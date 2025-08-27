@@ -1,0 +1,334 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  
+  body {
+    @apply bg-black text-white min-h-screen;
+    background-attachment: fixed;
+  }
+  
+  * {
+    @apply border-slate-800;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Better focus styles */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-blue-500 ring-offset-2 ring-offset-black;
+  }
+
+  /* Ensure all text is white by default */
+  h1, h2, h3, h4, h5, h6, p, span, div, label, input, textarea, select, option {
+    @apply text-white;
+  }
+
+  /* Override any black text */
+  .text-black, .text-gray-900, .text-gray-800, .text-gray-700, .text-gray-600 {
+    @apply text-white;
+  }
+}
+
+@layer components {
+  /* Enhanced button styles matching Podspace */
+  .btn-primary {
+    @apply bg-slate-800 hover:bg-slate-700 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-black shadow-sm hover:shadow-md;
+  }
+  
+  .btn-secondary {
+    @apply bg-transparent hover:bg-slate-800 text-white font-medium py-3 px-6 rounded-lg border border-slate-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-black;
+  }
+  
+  .btn-success {
+    @apply bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-black shadow-sm hover:shadow-md;
+  }
+  
+  .btn-warning {
+    @apply bg-amber-600 hover:bg-amber-700 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-black shadow-sm hover:shadow-md;
+  }
+  
+  .btn-error {
+    @apply bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-black shadow-sm hover:shadow-md;
+  }
+  
+  .btn-accent {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-black shadow-sm hover:shadow-md;
+  }
+
+  /* Enhanced input fields */
+  .input-field {
+    @apply block w-full rounded-lg border-slate-700 bg-slate-800 text-white placeholder-slate-400 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-black sm:text-sm transition-all duration-200 hover:border-slate-600;
+  }
+
+  /* Enhanced select dropdown styling */
+  .input-field option {
+    @apply bg-slate-800 text-white;
+  }
+
+  /* Enhanced card styles */
+  .card {
+    @apply bg-slate-800 rounded-xl shadow-sm border border-slate-700 p-6 hover:shadow-md transition-all duration-200;
+  }
+  
+  .card-header {
+    @apply border-b border-slate-700 pb-4 mb-4;
+  }
+
+  /* Glass morphism effect */
+  .glass {
+    @apply bg-slate-800/90 backdrop-blur-sm border border-slate-700 shadow-lg;
+  }
+
+  /* Enhanced sidebar styles */
+  .sidebar-item {
+    @apply flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 mx-2;
+  }
+  
+  .sidebar-item.active {
+    @apply bg-slate-700 text-white shadow-sm;
+  }
+  
+  .sidebar-item:not(.active) {
+    @apply text-slate-300 hover:bg-slate-800 hover:text-white;
+  }
+
+  /* Collapsible sidebar specific styles */
+  .sidebar-item.collapsed {
+    @apply justify-center px-2;
+  }
+
+  .sidebar-item.collapsed .icon {
+    @apply mx-0;
+  }
+
+  /* Smooth transitions for sidebar */
+  .sidebar-transition {
+    @apply transition-all duration-300 ease-in-out;
+  }
+
+  /* Tooltip styles */
+  .sidebar-tooltip {
+    @apply absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg border border-slate-700;
+  }
+
+  /* Enhanced code blocks */
+  .code-block {
+    @apply bg-slate-900 text-slate-100 p-4 rounded-lg font-mono text-sm overflow-x-auto shadow-sm border border-slate-700;
+  }
+
+  /* Enhanced status badges */
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium shadow-sm;
+  }
+  
+  .status-badge.success {
+    @apply bg-emerald-600/20 text-emerald-300 border border-emerald-600/30;
+  }
+  
+  .status-badge.warning {
+    @apply bg-amber-600/20 text-amber-300 border border-amber-600/30;
+  }
+  
+  .status-badge.error {
+    @apply bg-red-600/20 text-red-300 border border-red-600/30;
+  }
+  
+  .status-badge.info {
+    @apply bg-blue-600/20 text-blue-300 border border-blue-600/30;
+  }
+
+  /* Loading animations */
+  .loading-dots {
+    @apply inline-flex space-x-1;
+  }
+
+  .loading-dots > div {
+    @apply w-2 h-2 bg-current rounded-full animate-bounce;
+  }
+
+  .loading-dots > div:nth-child(2) {
+    animation-delay: 0.1s;
+  }
+
+  .loading-dots > div:nth-child(3) {
+    animation-delay: 0.2s;
+  }
+
+  /* Enhanced text selection */
+  ::selection {
+    @apply bg-blue-500/30 text-white;
+  }
+
+  /* Custom scrollbar */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.slate.600') theme('colors.slate.800');
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-slate-800 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-600 rounded-full hover:bg-slate-500;
+  }
+
+  /* Modern typography matching Podspace */
+  .text-gradient {
+    @apply bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text text-transparent;
+  }
+
+  .heading-xl {
+    @apply text-4xl md:text-5xl font-bold text-white leading-tight tracking-tight;
+  }
+
+  .heading-lg {
+    @apply text-3xl md:text-4xl font-bold text-white leading-tight tracking-tight;
+  }
+
+  .heading-md {
+    @apply text-2xl md:text-3xl font-semibold text-white leading-tight tracking-tight;
+  }
+
+  .body-lg {
+    @apply text-lg text-slate-200 leading-relaxed;
+  }
+
+  .body-md {
+    @apply text-base text-slate-200 leading-relaxed;
+  }
+
+  .body-sm {
+    @apply text-sm text-slate-300 leading-relaxed;
+  }
+
+  /* Text color utilities for better readability */
+  .text-primary {
+    @apply text-white;
+  }
+
+  .text-secondary {
+    @apply text-slate-200;
+  }
+
+  .text-muted {
+    @apply text-slate-400;
+  }
+
+  .text-accent {
+    @apply text-blue-400;
+  }
+
+  /* Badge styles */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-700 text-white;
+  }
+
+  .badge-new {
+    @apply bg-slate-700 text-white;
+  }
+
+  .badge-hot {
+    @apply bg-red-600 text-white;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text text-transparent;
+  }
+
+  /* Glass morphism utilities */
+  .backdrop-blur-sm {
+    backdrop-filter: blur(4px);
+  }
+
+  .backdrop-blur-md {
+    backdrop-filter: blur(12px);
+  }
+
+  .backdrop-blur-lg {
+    backdrop-filter: blur(16px);
+  }
+
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  /* Background utilities */
+  .bg-gradient-dark {
+    @apply bg-black;
+  }
+
+  /* Force white text for better readability */
+  .text-white-force {
+    @apply text-white !important;
+  }
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

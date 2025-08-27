@@ -1,0 +1,51 @@
+# ------------------------
+# Node / React (frontend)
+# ------------------------
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+.cache/
+.next/
+out/
+coverage/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# TailwindCSS
+*.css.map
+*.tailwind.css
+postcss.config.js
+.purgecss/
+*.purgecss
+
+# Vite / Webpack
+.vite/
+webpack-stats.json
+
+# ------------------------
+# Python (backend)
+# ------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+pip-wheel-metadata/
+*.so
+*.dll
+*.manifest
+*.spec
+
+# Virtual Environments
+.v
