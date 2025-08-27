@@ -89,6 +89,18 @@ class PromptResponse(BaseModel):
     provider_name: Optional[str] = None
     model_name: Optional[str] = None
     
+    @validator('last_output', pre=True)
+    def validate_last_output(cls, v):
+        if v is None or v == 'null' or v == '':
+            return None
+        if isinstance(v, str):
+            try:
+                import json
+                return json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return v
+    
     class Config:
         from_attributes = True
         # Add this to handle potential serialization issues

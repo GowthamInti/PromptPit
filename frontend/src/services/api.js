@@ -183,3 +183,119 @@ export const apiService = {
 };
 
 export default api;
+
+
+const apiServiceExtensions = {
+  // Get a specific prompt
+  getPrompt: (promptId) => {
+    return api.get(`/prompts/${promptId}`);
+  },
+
+  // Create a new prompt
+  createPrompt: (promptData) => {
+    return api.post('/prompts', promptData);
+  },
+
+  // Update an existing prompt
+  updatePrompt: (promptId, promptData) => {
+    return api.put(`/prompts/${promptId}`, promptData);
+  },
+
+  // Get prompt versions
+  getPromptVersions: (promptId) => {
+    return api.get(`/prompts/${promptId}/versions`);
+  },
+
+  // Lock a prompt version
+  lockPromptVersion: (promptId, versionData) => {
+    return api.post(`/prompts/${promptId}/versions`, versionData);
+  },
+
+  // Get all outputs
+  getOutputs: () => {
+    return api.get('/outputs');
+  },
+
+  // Get outputs for a specific prompt
+  getPromptOutputs: (promptId) => {
+    return api.get(`/prompts/${promptId}/outputs`);
+  },
+
+  // Get a specific output
+  getOutput: (outputId) => {
+    return api.get(`/outputs/${outputId}`);
+  },
+
+  // Test form data (for debugging)
+  testFormData: (data) => {
+    const formData = new FormData();
+    
+    // Add regular fields
+    Object.keys(data).forEach(key => {
+      if (key !== 'files' && data[key] !== undefined && data[key] !== null) {
+        formData.append(key, data[key]);
+      }
+    });
+    
+    // Add files
+    if (data.files && data.files.length > 0) {
+      data.files.forEach(file => {
+        formData.append('files', file);
+      });
+    }
+    
+    return api.post('/test-form-data', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
+  // Enhanced runPrompt method with file support
+  runPrompt: (data) => {
+    const formData = new FormData();
+    
+    // Add all form fields
+    const fields = [
+      'prompt_id', 'provider_id', 'model_id', 'text', 'title', 
+      'system_prompt', 'temperature', 'max_tokens', 'include_file_content', 
+      'file_content_prefix'
+    ];
+    
+    fields.forEach(field => {
+      if (data[field] !== undefined && data[field] !== null) {
+        formData.append(field, data[field]);
+      }
+    });
+    
+    // Add files
+    if (data.files && data.files.length > 0) {
+      data.files.forEach(file => {
+        formData.append('files', file);
+      });
+    }
+    
+    // Add images
+    if (data.images && data.images.length > 0) {
+      data.images.forEach(image => {
+        formData.append('images', image);
+      });
+    }
+    
+    return api.post('/run', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
+  // Get supported file types
+  getSupportedFileTypes: () => {
+    return api.get('/supported-file-types');
+  }
+};
+
+// If you're using a module system, export these extensions
+// or merge them with your existing apiService object
+
+export { apiServiceExtensions };

@@ -105,21 +105,23 @@ const CollapsibleSidebar = ({ children }) => {
             </div>
           )}
           
-          <div className={`flex items-center space-x-1 ${!shouldExpand ? 'hidden' : ''}`}>
-            {/* Pin button */}
-            <button
-              onClick={() => setIsPinned(!isPinned)}
-              className={`p-1.5 rounded-md transition-all duration-200 ${
-                isPinned 
-                  ? 'bg-blue-600 text-white' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
-              title={isPinned ? 'Unpin sidebar' : 'Pin sidebar'}
-            >
-              <MapPinIcon className="h-4 w-4" />
-            </button>
+          <div className="flex items-center space-x-1">
+            {/* Pin button - only show when expanded */}
+            {shouldExpand && (
+              <button
+                onClick={() => setIsPinned(!isPinned)}
+                className={`p-1.5 rounded-md transition-all duration-200 ${
+                  isPinned 
+                    ? 'bg-blue-600 text-white' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+                title={isPinned ? 'Unpin sidebar' : 'Pin sidebar'}
+              >
+                <MapPinIcon className="h-4 w-4" />
+              </button>
+            )}
             
-            {/* Collapse/Expand button */}
+            {/* Collapse/Expand button - always show */}
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-all duration-200"

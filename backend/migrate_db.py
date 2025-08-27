@@ -154,10 +154,16 @@ def migrate_prompt_versions():
             
             if 'last_output' not in columns:
                 print("📝 Adding last_output column to prompts table...")
-                conn.execute(text("""
-                    ALTER TABLE prompts 
-                    ADD COLUMN last_output TEXT
-                """))
+                if db_type == "sqlite":
+                    conn.execute(text("""
+                        ALTER TABLE prompts 
+                        ADD COLUMN last_output TEXT
+                    """))
+                else:  # postgresql
+                    conn.execute(text("""
+                        ALTER TABLE prompts 
+                        ADD COLUMN last_output JSON
+                    """))
                 print("✅ last_output column added successfully.")
             
             if 'updated_at' not in columns:
