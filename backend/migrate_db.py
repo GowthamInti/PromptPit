@@ -508,6 +508,59 @@ def migrate_vision_support():
 #         print(f"❌ Error adding sample data: {e}")
 #         return False
 
+def migrate_prompt_title_constraints():
+    """Migrate database to add unique constraints on prompt titles."""
+    try:
+        engine = create_engine(DATABASE_URL)
+        
+        with engine.connect() as conn:
+            print("🔄 Starting prompt title constraints migration...")
+            
+            # Detect database type
+            db_type = "postgresql" if "postgresql" in DATABASE_URL else "sqlite"
+            print(f"🔍 Detected database type: {db_type}")
+            
+            # Check if unique constraint already exists
+            if db_type == "sqlite":
+                # For SQLite, we need to recreate the table to add constraints
+                # This is a simplified approach - in production, you'd want more careful migration
+                print("ℹ️  SQLite detected. Unique constraints will be applied on next table recreation.")
+            else:  # postgresql
+                # Check if constraint exists
+                result = conn.execute(text("""
+                    SELECT constraint_name FROM information_schema.table_constraints 
+                    WHERE table_name = 'prompts' AND constraint_type = 'UNIQUE' 
+                    AND constraint_name LIKE '%title%'
+                """))
+                
+                if not result.fetchone():
+                    print("📝 Adding unique constraint on prompt titles...")
+                    conn.execute(text("""
+                        ALTER TABLE prompts 
+                        ADD CONSTRAINT unique_prompt_title_per_user 
+                        UNIQUE (title, user_id)
+                    """))
+                    print("✅ Unique constraint added successfully")
+                else:
+                    print("ℹ️  Unique constraint already exists")
+            
+            # Add is_active column if it doesn't exist
+            try:
+                conn.execute(text("ALTER TABLE prompts ADD COLUMN is_active BOOLEAN DEFAULT TRUE"))
+                print("✅ Added is_active column to prompts table")
+            except Exception as e:
+                if "already exists" in str(e) or "duplicate column" in str(e):
+                    print("ℹ️  is_active column already exists")
+                else:
+                    raise e
+            
+            conn.commit()
+            return True
+            
+    except Exception as e:
+        print(f"❌ Error in prompt title constraints migration: {e}")
+        return False
+
 def main():
     """Main migration function."""
     print("🚀 Starting database migration...")
@@ -526,6 +579,10 @@ def main():
     
     # Run vision support migration
     if not migrate_vision_support():
+        sys.exit(1)
+    
+    # Run prompt title constraints migration
+    if not migrate_prompt_title_constraints():
         sys.exit(1)
     
     # Skip adding sample data

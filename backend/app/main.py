@@ -7,7 +7,7 @@ import os
 
 from app.database.connection import get_db, engine
 from app.database import models
-from app.api import providers, prompts, judge, experiments, model_cards
+from app.api import providers, prompts
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
@@ -87,9 +87,6 @@ app.add_middleware(
 # Include API routes
 app.include_router(providers.router, prefix="/api", tags=["providers"])
 app.include_router(prompts.router, prefix="/api", tags=["prompts"])
-app.include_router(judge.router, prefix="/api", tags=["judge"])
-app.include_router(experiments.router, prefix="/api", tags=["experiments"])
-app.include_router(model_cards.router, prefix="/api", tags=["model-cards"])
 
 # Health check with detailed info
 @app.get("/api/health", tags=["health"])

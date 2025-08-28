@@ -46,12 +46,13 @@ class Prompt(Base):
     user_id = Column(String(100), default="default_user")  # For multi-user support later
     provider_id = Column(Integer, ForeignKey("providers.id"), nullable=False)
     model_id = Column(Integer, ForeignKey("models.id"), nullable=False)
-    title = Column(String(255))
+    title = Column(String(255), nullable=False)
     text = Column(Text, nullable=False)
     system_prompt = Column(Text)  # Optional system message
     temperature = Column(Float, default=0.7)
     max_tokens = Column(Integer, default=1000)
     last_output = Column(JSON)  # Store the last output for quick access
+    is_active = Column(Boolean, default=True)  # Track if prompt is active or archived
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

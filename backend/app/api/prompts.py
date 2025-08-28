@@ -62,6 +62,19 @@ async def create_prompt(
         if not model:
             raise HTTPException(status_code=404, detail="Model not found")
         
+        # Check if a prompt with the same title already exists for this user
+        existing_prompt = db.query(Prompt).filter(
+            Prompt.title == prompt_data.title,
+            Prompt.user_id == prompt_data.user_id,
+            Prompt.is_active == True
+        ).first()
+        
+        if existing_prompt:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"A prompt with title '{prompt_data.title}' already exists. Please use a different title."
+            )
+        
         prompt = Prompt(
             provider_id=prompt_data.provider_id,
             model_id=prompt_data.model_id,
@@ -84,11 +97,124 @@ async def create_prompt(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create prompt: {str(e)}")
 
+@router.get("/prompts/with-versions")
+def get_prompts_with_versions(
+    user_id: str = "default_user",
+    provider_id: Optional[int] = None,
+    model_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all prompts with their versions grouped together.
+    This endpoint returns prompts with their associated versions as nested data.
+    """
+    try:
+        # Build base query for prompts
+        query = db.query(Prompt).filter(
+            Prompt.user_id == user_id,
+            Prompt.is_active == True
+        )
+        
+        if provider_id:
+            query = query.filter(Prompt.provider_id == provider_id)
+        if model_id:
+            query = query.filter(Prompt.model_id == model_id)
+        
+        prompts = query.order_by(Prompt.created_at.desc()).all()
+        
+        result = []
+        for prompt in prompts:
+            # Get versions for this prompt
+            versions = db.query(PromptVersion).filter(
+                PromptVersion.prompt_id == prompt.id
+            ).order_by(PromptVersion.version_number.desc()).all()
+            
+            # Get provider and model names
+            provider = db.query(Provider).filter(Provider.id == prompt.provider_id).first()
+            model = db.query(Model).filter(Model.id == prompt.model_id).first()
+            
+            prompt_data = {
+                "id": prompt.id,
+                "uuid": prompt.uuid,
+                "title": prompt.title,
+                "text": prompt.text,
+                "system_prompt": prompt.system_prompt,
+                "temperature": prompt.temperature,
+                "max_tokens": prompt.max_tokens,
+                "provider_id": prompt.provider_id,
+                "provider_name": provider.name if provider else None,
+                "model_id": prompt.model_id,
+                "model_name": model.name if model else None,
+                "last_output": prompt.last_output,
+                "created_at": prompt.created_at,
+                "updated_at": prompt.updated_at,
+                "versions_count": len(versions),
+                "versions": [
+                    {
+                        "id": version.id,
+                        "version_number": version.version_number,
+                        "prompt_text": version.prompt_text,
+                        "system_prompt": version.system_prompt,
+                        "temperature": version.temperature,
+                        "max_tokens": version.max_tokens,
+                        "files": version.files,
+                        "images": version.images,
+                        "output": version.output,
+                        "locked_by_user": version.locked_by_user,
+                        "created_at": version.created_at
+                    }
+                    for version in versions
+                ]
+            }
+            result.append(prompt_data)
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch prompts with versions: {str(e)}")
+
+@router.delete("/prompts/{prompt_id}/versions/{version_id}")
+async def delete_prompt_version(
+    prompt_id: int,
+    version_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a specific version of a prompt.
+    """
+    try:
+        # Check if prompt exists
+        prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+        if not prompt:
+            raise HTTPException(status_code=404, detail="Prompt not found")
+        
+        # Check if version exists
+        version = db.query(PromptVersion).filter(
+            PromptVersion.id == version_id,
+            PromptVersion.prompt_id == prompt_id
+        ).first()
+        
+        if not version:
+            raise HTTPException(status_code=404, detail="Version not found")
+        
+        # Delete the version
+        db.delete(version)
+        db.commit()
+        
+        return {"message": f"Version {version.version_number} deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete version: {str(e)}")
+
 @router.get("/prompts", response_model=List[PromptResponse])
 def get_prompts(
     user_id: str = "default_user",
     provider_id: Optional[int] = None,
     model_id: Optional[int] = None,
+    include_versions: bool = False,
     db: Session = Depends(get_db)
 ):
     """
@@ -97,6 +223,7 @@ def get_prompts(
     - **user_id**: Filter by user ID
     - **provider_id**: Filter by provider ID
     - **model_id**: Filter by model ID
+    - **include_versions**: Include version information for each prompt
     """
     query = db.query(Prompt)
     
