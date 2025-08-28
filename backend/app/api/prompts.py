@@ -210,7 +210,7 @@ async def delete_prompt(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to delete prompt: {str(e)}")
 
-@router.post("/run", response_model=OutputResponse)
+@router.post("/run")
 async def run_prompt(
     prompt_id: Optional[int] = Form(None),
     provider_id: int = Form(...),
@@ -244,27 +244,12 @@ async def run_prompt(
         if not model:
             raise HTTPException(status_code=404, detail="Model not found")
         
-        # Create or update prompt if prompt_id is provided
+        # Get existing prompt if prompt_id is provided
         prompt = None
         if prompt_id:
             prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
             if not prompt:
                 raise HTTPException(status_code=404, detail="Prompt not found")
-        else:
-            # Create new prompt
-            prompt = Prompt(
-                provider_id=provider_id,
-                model_id=model_id,
-                title=title or "Untitled Prompt",
-                text=text,
-                system_prompt=system_prompt,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                user_id="default_user"
-            )
-            db.add(prompt)
-            db.commit()
-            db.refresh(prompt)
         
         # Execute the prompt using the provider service
         start_time = time.time()
@@ -308,26 +293,42 @@ async def run_prompt(
             end_time = time.time()
             latency_ms = (end_time - start_time) * 1000
             
-            # Create output record
-            output = Output(
-                prompt_id=prompt.id,
-                output_text=result.get('output_text', ''),
-                latency_ms=latency_ms,
-                token_usage=result.get('token_usage', {}),
-                cost_usd=result.get('cost', 0.0),
-                response_metadata=result.get('response_metadata', {})
-            )
+            # Create output record (only if we have a prompt_id)
+            output_data = {
+                'output_text': result.get('output_text', ''),
+                'latency_ms': latency_ms,
+                'token_usage': result.get('token_usage', {}),
+                'cost_usd': result.get('cost', 0.0),
+                'response_metadata': result.get('response_metadata', {})
+            }
             
-            db.add(output)
-            db.commit()
-            db.refresh(output)
-            
-            return OutputResponse.from_orm(output)
+            # Only save to database if we have a prompt_id
+            if prompt:
+                output = Output(
+                    prompt_id=prompt.id,
+                    **output_data
+                )
+                db.add(output)
+                db.commit()
+                db.refresh(output)
+                return OutputResponse.from_orm(output)
+            else:
+                # For new prompts without a prompt_id, return a simplified response
+                # that doesn't require database fields
+                from datetime import datetime
+                return {
+                    "id": None,
+                    "prompt_id": None,
+                    "output_text": output_data['output_text'],
+                    "latency_ms": output_data['latency_ms'],
+                    "token_usage": output_data['token_usage'],
+                    "cost_usd": output_data['cost_usd'],
+                    "response_metadata": output_data['response_metadata'],
+                    "created_at": datetime.utcnow().isoformat()
+                }
             
         except Exception as e:
-            # If prompt execution fails, still save the prompt but return error
-            if not prompt_id:
-                db.commit()  # Save the prompt even if execution failed
+            # If prompt execution fails, return error without saving
             raise HTTPException(status_code=500, detail=f"Failed to execute prompt: {str(e)}")
             
     except HTTPException:
@@ -401,6 +402,49 @@ async def test_form_data(
     }
 
 # Versioning endpoints
+@router.post("/prompts/create-and-lock")
+async def create_and_lock_prompt(
+    version_data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new prompt and lock its first version.
+    This is used when locking a version for a new prompt that hasn't been saved yet.
+    """
+    try:
+        # Create the prompt first
+        prompt = Prompt(
+            provider_id=version_data.get("provider_id"),
+            model_id=version_data.get("model_id"),
+            title=version_data.get("title", "Untitled Prompt"),
+            text=version_data.get("prompt_text", ""),
+            system_prompt=version_data.get("system_prompt", ""),
+            temperature=version_data.get("temperature", 0.7),
+            max_tokens=version_data.get("max_tokens", 1000),
+            user_id=version_data.get("user_id", "default_user")
+        )
+        
+        db.add(prompt)
+        db.commit()
+        db.refresh(prompt)
+        
+        # Now lock the version
+        result = await lock_prompt_version_internal(prompt.id, version_data, db)
+        # Add the prompt_id to the result
+        result["prompt_id"] = prompt.id
+        return result
+        
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
+    except Exception as e:
+        db.rollback()
+        print(f"Error creating and locking prompt: {str(e)}")
+        print(f"Error type: {type(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create and lock prompt: {str(e)}")
+
 @router.post("/prompts/{prompt_id}/versions")
 async def lock_prompt_version(
     prompt_id: int,
@@ -408,14 +452,32 @@ async def lock_prompt_version(
     db: Session = Depends(get_db)
 ):
     """
-    Lock a new version of a prompt.
+    Lock a new version of an existing prompt.
     This creates a versioned snapshot of the prompt with its current state and output.
     """
     prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
     if not prompt:
         raise HTTPException(status_code=404, detail="Prompt not found")
     
+    return await lock_prompt_version_internal(prompt_id, version_data, db)
+
+async def lock_prompt_version_internal(
+    prompt_id: int,
+    version_data: dict,
+    db: Session
+):
+    """
+    Internal function to lock a prompt version.
+    """
+    
     try:
+        # Validate required fields
+        if not version_data.get("prompt_text"):
+            raise ValueError("prompt_text is required")
+        if not version_data.get("provider_id"):
+            raise ValueError("provider_id is required")
+        if not version_data.get("model_id"):
+            raise ValueError("model_id is required")
         # Get the next version number
         latest_version = db.query(PromptVersion).filter(
             PromptVersion.prompt_id == prompt_id
@@ -423,21 +485,73 @@ async def lock_prompt_version(
         
         version_number = (latest_version.version_number + 1) if latest_version else 1
         
+        # Process files and images to extract metadata
+        files_metadata = []
+        if version_data.get("files"):
+            for file in version_data.get("files", []):
+                if hasattr(file, 'name'):  # It's a File object
+                    files_metadata.append({
+                        "name": file.name,
+                        "size": file.size,
+                        "type": file.type
+                    })
+                else:  # It's already metadata
+                    files_metadata.append(file)
+        
+        images_metadata = []
+        if version_data.get("images"):
+            for image in version_data.get("images", []):
+                if hasattr(image, 'name'):  # It's a File object
+                    images_metadata.append({
+                        "name": image.name,
+                        "size": image.size,
+                        "type": image.type
+                    })
+                else:  # It's already metadata
+                    images_metadata.append(image)
+        
+        # Validate and clean output data for JSON serialization
+        output_data = version_data.get("output")
+        if output_data:
+            # Ensure output_data is JSON serializable
+            import json
+            try:
+                # Test JSON serialization
+                json.dumps(output_data)
+            except (TypeError, ValueError) as e:
+                print(f"Warning: Output data is not JSON serializable: {e}")
+                # Convert to a serializable format
+                if isinstance(output_data, dict):
+                    # Try to convert any non-serializable values
+                    cleaned_output = {}
+                    for key, value in output_data.items():
+                        try:
+                            json.dumps(value)
+                            cleaned_output[key] = value
+                        except (TypeError, ValueError):
+                            cleaned_output[key] = str(value)
+                    output_data = cleaned_output
+                else:
+                    output_data = str(output_data)
+        
+        # Get prompt data for fallback values (only if prompt exists)
+        prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+        
         # Create the version
         version = PromptVersion(
             prompt_id=prompt_id,
             version_number=version_number,
-            prompt_text=version_data.get("prompt_text", prompt.text),
-            system_prompt=version_data.get("system_prompt", prompt.system_prompt),
-            temperature=version_data.get("temperature", prompt.temperature),
-            max_tokens=version_data.get("max_tokens", prompt.max_tokens),
-            provider_id=version_data.get("provider_id", prompt.provider_id),
-            model_id=version_data.get("model_id", prompt.model_id),
-            files=version_data.get("files", []),
-            images=version_data.get("images", []),
+            prompt_text=version_data.get("prompt_text", prompt.text if prompt else ""),
+            system_prompt=version_data.get("system_prompt", prompt.system_prompt if prompt else ""),
+            temperature=version_data.get("temperature", prompt.temperature if prompt else 0.7),
+            max_tokens=version_data.get("max_tokens", prompt.max_tokens if prompt else 1000),
+            provider_id=version_data.get("provider_id", prompt.provider_id if prompt else None),
+            model_id=version_data.get("model_id", prompt.model_id if prompt else None),
+            files=files_metadata,
+            images=images_metadata,
             include_file_content=version_data.get("include_file_content", True),
             file_content_prefix=version_data.get("file_content_prefix", "File content:\n"),
-            output=version_data.get("output"),
+            output=output_data,
             locked_by_user=version_data.get("locked_by_user", "default_user")
         )
         
@@ -447,13 +561,21 @@ async def lock_prompt_version(
         
         return {
             "id": version.id,
+            "prompt_id": prompt_id,
             "version_number": version.version_number,
             "created_at": version.created_at,
             "message": f"Version {version_number} locked successfully"
         }
         
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
     except Exception as e:
         db.rollback()
+        print(f"Error locking version: {str(e)}")
+        print(f"Error type: {type(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to lock version: {str(e)}")
 
 @router.get("/prompts/{prompt_id}/versions")

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   PlayIcon, 
@@ -13,8 +13,7 @@ import {
   ArrowPathIcon,
   EyeIcon,
   PencilIcon,
-  ArrowsPointingOutIcon,
-  ArrowsPointingInIcon,
+  PlusIcon,
   Cog6ToothIcon
 } from '@heroicons/react/24/outline';
 import { useProviders } from '../contexts/ProviderContext';
@@ -36,12 +35,19 @@ const PromptEditor = () => {
     createPrompt,
     updatePrompt,
     lockPromptVersion,
+    createAndLockPrompt,
     runPrompt,
     duplicatePrompt,
     deletePrompt
   } = usePrompts();
 
+  // Generate unique temporary ID for new prompts
+  const generateTempId = () => {
+    return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  };
+
   const [promptData, setPromptData] = useState({
+    id: generateTempId(),
     title: '',
     text: '',
     system_prompt: '',
@@ -56,10 +62,11 @@ const PromptEditor = () => {
   const [showVersions, setShowVersions] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isNewPrompt, setIsNewPrompt] = useState(false);
-  const [expandedSection, setExpandedSection] = useState(null); // 'prompt', 'output', or null
-  const [showModelConfigModal, setShowModelConfigModal] = useState(false);
-  const [showPromptModal, setShowPromptModal] = useState(false);
-  const [showOutputModal, setShowOutputModal] = useState(false);
+  const [showModelConfig, setShowModelConfig] = useState(false);
+
+  // Refs for file inputs
+  const fileInputRef = useRef(null);
+  const imageInputRef = useRef(null);
 
   // Determine if this is a new prompt or editing existing
   useEffect(() => {
@@ -69,7 +76,6 @@ const PromptEditor = () => {
       setCurrentPrompt(null);
     } else {
       setIsNewPrompt(false);
-      // Load existing prompt only if promptId is a valid number
       if (promptId && !isNaN(parseInt(promptId))) {
         fetchPromptById(promptId);
       } else {
@@ -96,8 +102,8 @@ const PromptEditor = () => {
       setOutput(currentPrompt.last_output || null);
       setIsEditing(false);
     } else if (isNewPrompt) {
-      // Reset to default state for new prompt
       setPromptData({
+        id: generateTempId(),
         title: '',
         text: '',
         system_prompt: '',
@@ -117,7 +123,6 @@ const PromptEditor = () => {
       const firstProvider = providers[0];
       setSelectedProvider(firstProvider);
       
-      // Auto-select first model for this provider
       const providerModels = models.filter(m => m.provider_id === firstProvider.id);
       if (providerModels.length > 0) {
         setSelectedModel(providerModels[0]);
@@ -187,64 +192,33 @@ const PromptEditor = () => {
   };
 
   const handleSavePrompt = async () => {
-    if (!promptData.title.trim()) {
-      toast.error('Please enter a title for your prompt');
-      return;
-    }
-
-    if (!promptData.text.trim()) {
-      toast.error('Please enter a prompt');
+    if (!promptData.title.trim() || !promptData.text.trim()) {
+      toast.error('Please fill in all required fields');
       return;
     }
 
     try {
-      const promptPayload = {
-        ...promptData,
-        provider_id: selectedProvider?.id,
-        model_id: selectedModel?.id,
-        files: uploadedFiles,
-        images: uploadedImages,
-        include_file_content: includeFileContent,
-        file_content_prefix: fileContentPrefix,
-      };
-
       if (isNewPrompt) {
-        const newPrompt = await createPrompt(promptPayload);
-        navigate(`/editor/${newPrompt.id}`);
-      } else if (currentPrompt) {
-        await updatePrompt(currentPrompt.id, promptPayload);
+        await createPrompt({
+          ...promptData,
+          provider_id: selectedProvider.id,
+          model_id: selectedModel.id,
+          files: uploadedFiles,
+          images: uploadedImages,
+        });
+        toast.success('Prompt created successfully!');
+        navigate('/editor');
+      } else {
+        await updatePrompt(currentPrompt.id, {
+          ...promptData,
+          files: uploadedFiles,
+          images: uploadedImages,
+        });
+        toast.success('Prompt updated successfully!');
       }
     } catch (error) {
       console.error('Error saving prompt:', error);
-    }
-  };
-
-  const handleLockVersion = async () => {
-    if (!currentPrompt) {
-      toast.error('Please save the prompt first');
-      return;
-    }
-
-    try {
-      const versionPayload = {
-        prompt_text: promptData.text,
-        system_prompt: promptData.system_prompt,
-        temperature: promptData.temperature,
-        max_tokens: promptData.max_tokens,
-        provider_id: selectedProvider?.id,
-        model_id: selectedModel?.id,
-        files: uploadedFiles,
-        images: uploadedImages,
-        include_file_content: includeFileContent,
-        file_content_prefix: fileContentPrefix,
-        output: output,
-      };
-
-      await lockPromptVersion(currentPrompt.id, versionPayload);
-      await fetchPromptVersions(currentPrompt.id);
-      setShowVersions(true);
-    } catch (error) {
-      console.error('Error locking version:', error);
+      toast.error('Failed to save prompt');
     }
   };
 
@@ -282,21 +256,52 @@ const PromptEditor = () => {
       
       const response = await runPrompt(requestData);
       setOutput(response);
-
-      // Update current prompt with new output if it exists
-      if (currentPrompt) {
-        await updatePrompt(currentPrompt.id, { last_output: response });
-      }
-
       toast.success('Prompt executed successfully!');
     } catch (error) {
       console.error('Error running prompt:', error);
+      toast.error('Failed to run prompt');
     }
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    toast.success('Copied to clipboard!');
+  const handleLockVersion = async () => {
+    if (!output) {
+      toast.error('No output to lock');
+      return;
+    }
+
+    try {
+      const versionData = {
+        prompt_text: promptData.text,
+        system_prompt: promptData.system_prompt,
+        temperature: promptData.temperature,
+        max_tokens: promptData.max_tokens,
+        provider_id: selectedProvider.id,
+        model_id: selectedModel.id,
+        title: promptData.title || 'Untitled Prompt',
+        files: uploadedFiles,
+        images: uploadedImages,
+        output: output,
+      };
+
+      let result;
+      
+      // If this is a new prompt, create and lock in one operation
+      if (isNewPrompt) {
+        result = await createAndLockPrompt(versionData);
+        setCurrentPrompt({ id: result.prompt_id, ...promptData });
+        setIsNewPrompt(false);
+      } else {
+        // For existing prompts, just lock the version
+        result = await lockPromptVersion(currentPrompt.id, versionData);
+      }
+      
+      await fetchPromptVersions(result.prompt_id || currentPrompt.id);
+      setShowVersions(true);
+      
+    } catch (error) {
+      console.error('Error locking version:', error);
+      toast.error('Failed to lock version');
+    }
   };
 
   const handleDuplicatePrompt = async (promptId) => {
@@ -322,552 +327,437 @@ const PromptEditor = () => {
     }
   };
 
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard!');
+  };
+
+  const loadVersion = (version) => {
+    // Populate the prompt editor with the selected version data
+    setPromptData({
+      title: version.title || currentPrompt?.title || '',
+      text: version.prompt_text || '',
+      system_prompt: version.system_prompt || '',
+      temperature: version.temperature || 0.7,
+      max_tokens: version.max_tokens || 1000,
+    });
+    
+    // Set the output if available
+    if (version.output) {
+      setOutput(version.output);
+    }
+    
+    // Set files and images if available
+    if (version.files) {
+      setUploadedFiles(version.files);
+    }
+    if (version.images) {
+      setUploadedImages(version.images);
+    }
+    
+    // Enable editing mode
+    setIsEditing(true);
+    
+    toast.success('Version loaded into editor!');
+  };
+
   return (
-    <div className="h-screen flex flex-col animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
+    <div className="h-screen flex flex-col bg-black">
+      {/* Single Header */}
+      <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <button
             onClick={() => navigate('/editor')}
-            className="btn-secondary inline-flex items-center"
+            className="text-gray-300 hover:text-white transition-colors"
           >
-            <ArrowLeftIcon className="h-4 w-4 mr-2" />
-            Back to Prompts
+            <ArrowLeftIcon className="h-5 w-5" />
           </button>
-          <div>
-            <h1 className="heading-lg text-gradient">
-              {isNewPrompt ? 'New Prompt' : (currentPrompt?.title || 'Loading...')}
-            </h1>
-            <p className="mt-1 body-sm text-secondary">
-              {isNewPrompt ? 'Create a new prompt' : 'Edit and run your prompt'}
-            </p>
-          </div>
+          <h1 className="text-xl font-semibold">
+            {isNewPrompt ? 'New Prompt' : (currentPrompt?.title || 'Loading...')}
+          </h1>
         </div>
         
-        {/* Model Configuration Capsule */}
+        {/* Action Buttons */}
         <div className="flex items-center space-x-3">
-          {/* Different buttons for new prompt vs existing prompt */}
-          {isNewPrompt ? (
-            // New prompt - only model config
-            <div className="bg-slate-800/50 rounded-full px-4 py-2 border border-slate-600/50 hover:bg-slate-700/50 transition-colors cursor-pointer"
-                 onClick={() => setShowModelConfigModal(true)}>
-              <div className="flex items-center space-x-2">
-                <Cog6ToothIcon className="h-4 w-4 text-accent" />
-                <span className="text-sm font-medium text-primary">
-                  {selectedProvider?.name || 'No Provider'} / {selectedModel?.name || 'No Model'}
-                </span>
-                {selectedModel?.supports_vision && (
-                  <span className="w-2 h-2 bg-emerald-400 rounded-full"></span>
-                )}
-              </div>
-            </div>
-          ) : (
-            // Existing prompt - all action buttons
+          {!isNewPrompt && currentPrompt && (
             <>
               <button
                 onClick={() => setIsEditing(!isEditing)}
-                className="btn-secondary inline-flex items-center"
+                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors inline-flex items-center"
               >
                 {isEditing ? <EyeIcon className="h-4 w-4 mr-2" /> : <PencilIcon className="h-4 w-4 mr-2" />}
                 {isEditing ? 'View' : 'Edit'}
               </button>
               <button
                 onClick={() => setShowVersions(!showVersions)}
-                className="btn-secondary inline-flex items-center"
+                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors inline-flex items-center"
               >
                 <ClockIcon className="h-4 w-4 mr-2" />
                 Versions
               </button>
               <button
                 onClick={() => handleDuplicatePrompt(currentPrompt.id)}
-                className="btn-secondary inline-flex items-center"
+                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors inline-flex items-center"
               >
                 <DocumentDuplicateIcon className="h-4 w-4 mr-2" />
                 Duplicate
               </button>
               <button
                 onClick={() => handleDeletePrompt(currentPrompt.id, currentPrompt.title)}
-                className="btn-secondary inline-flex items-center text-red-400 hover:text-red-300"
+                className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg transition-colors inline-flex items-center"
               >
                 <XMarkIcon className="h-4 w-4 mr-2" />
                 Delete
               </button>
-              
-              {/* Model Config Capsule */}
-              <div className="bg-slate-800/50 rounded-full px-4 py-2 border border-slate-600/50 hover:bg-slate-700/50 transition-colors cursor-pointer"
-                   onClick={() => setShowModelConfigModal(true)}>
-                <div className="flex items-center space-x-2">
-                  <Cog6ToothIcon className="h-4 w-4 text-accent" />
-                  <span className="text-sm font-medium text-primary">
-                    {selectedProvider?.name || 'No Provider'} / {selectedModel?.name || 'No Model'}
-                  </span>
-                  {selectedModel?.supports_vision && (
-                    <span className="w-2 h-2 bg-emerald-400 rounded-full"></span>
-                  )}
-                </div>
-              </div>
             </>
           )}
+          
+          {/* Model Configuration Capsule */}
+          <button
+            onClick={() => setShowModelConfig(!showModelConfig)}
+            className="bg-gray-700 hover:bg-gray-600 rounded-full px-4 py-2 flex items-center space-x-2 transition-colors"
+          >
+            <Cog6ToothIcon className="h-4 w-4" />
+            <span className="text-sm">
+              {selectedProvider?.name || 'No Provider'} / {selectedModel?.name || 'No Model'}
+            </span>
+          </button>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel - Prompt */}
-        <div className={`flex flex-col transition-all duration-300 ${expandedSection === 'output' ? 'w-1/4' : 'w-1/2'}`}>
-          <div className="flex-1 flex flex-col p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="heading-md text-primary">Prompt</h2>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setShowPromptModal(true)}
-                  className="p-2 text-slate-400 hover:text-accent transition-colors"
-                  title="Expand prompt"
-                >
-                  <ArrowsPointingOutIcon className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setExpandedSection(expandedSection === 'prompt' ? null : 'prompt')}
-                  className="p-2 text-slate-400 hover:text-accent transition-colors"
-                  title={expandedSection === 'prompt' ? 'Collapse' : 'Expand'}
-                >
-                  {expandedSection === 'prompt' ? 
-                    <ArrowsPointingInIcon className="h-4 w-4" /> : 
-                    <ArrowsPointingOutIcon className="h-4 w-4" />
-                  }
-                </button>
+      {/* Model Configuration Dropdown */}
+      {showModelConfig && (
+        <div className="bg-gray-700 text-white px-6 py-4 border-b border-gray-600">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Provider</label>
+              <select
+                value={selectedProvider?.id || ''}
+                onChange={(e) => handleProviderChange(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select Provider</option>
+                {providers.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.name.charAt(0).toUpperCase() + provider.name.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Model</label>
+              <select
+                value={selectedModel?.id || ''}
+                onChange={(e) => handleModelChange(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={!selectedProvider}
+              >
+                <option value="">Select Model</option>
+                {models
+                  .filter(model => !selectedProvider || model.provider_id === selectedProvider.id)
+                  .map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Temperature</label>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={promptData.temperature}
+                onChange={(e) => setPromptData(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-300 mt-1">
+                <span>0</span>
+                <span>{promptData.temperature}</span>
+                <span>2</span>
               </div>
             </div>
-            
-            <div className="flex-1 space-y-4 overflow-y-auto">
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-2">
-                  Title *
-                </label>
-                <input
-                  type="text"
-                  value={promptData.title}
-                  onChange={(e) => setPromptData(prev => ({ ...prev, title: e.target.value }))}
-                  className="input-field font-mono"
-                  placeholder="Enter a title for your prompt"
-                  disabled={!isEditing}
-                />
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-2">
-                  System Prompt (Optional)
-                </label>
-                <textarea
-                  value={promptData.system_prompt}
-                  onChange={(e) => setPromptData(prev => ({ ...prev, system_prompt: e.target.value }))}
-                  className="input-field font-mono"
-                  rows={4}
-                  placeholder="Enter a system prompt to set the behavior of the model..."
-                  disabled={!isEditing}
-                />
+            <div>
+              <label className="block text-sm font-medium mb-2">Output Tokens</label>
+              <input
+                type="range"
+                min="1"
+                max="4000"
+                step="1"
+                value={promptData.max_tokens}
+                onChange={(e) => setPromptData(prev => ({ ...prev, max_tokens: parseInt(e.target.value) }))}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-300 mt-1">
+                <span>1</span>
+                <span>{promptData.max_tokens}</span>
+                <span>4000</span>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div>
+      {/* Main Content */}
+      <div className="flex-1 flex">
+        {/* Messages Section */}
+        <div className="flex-1 bg-slate-900 p-6">
+          <h2 className="text-lg font-semibold text-white mb-6">Messages</h2>
+          
+          {/* Title Field */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-white mb-2">
+              Prompt Title *
+            </label>
+            <input
+              type="text"
+              value={promptData.title}
+              onChange={(e) => setPromptData(prev => ({ ...prev, title: e.target.value }))}
+              className="w-full px-4 py-3 border border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-slate-400 bg-slate-800"
+              placeholder="Enter a title for your prompt..."
+              disabled={!isEditing}
+            />
+          </div>
+          
+          {/* System Message */}
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 mb-6 shadow-sm">
+            <div className="flex items-center mb-4">
+              <span className="bg-slate-700 text-slate-300 px-2 py-1 rounded text-xs font-medium">System</span>
+            </div>
+            <textarea
+              value={promptData.system_prompt}
+              onChange={(e) => setPromptData(prev => ({ ...prev, system_prompt: e.target.value }))}
+              className="w-full border-0 resize-none focus:ring-0 text-white font-mono text-sm bg-transparent"
+              rows={12}
+              placeholder="You are RadBot, an AI assistant specialized in generating structured radiology reports.  
+
+Your role:
+- Help clinicians draft radiology reports in a clear, standardized format.
+- Use professional medical language appropriate for clinical documentation.
+- Structure reports with sections such as: 
+  - Clinical Indication / History
+  - Technique
+  - Findings
+  - Impression (conclusion)
+- Ensure findings are objective and descriptive.
+- Keep interpretations evidence-based, cautious, and aligned with radiology reporting best practices.
+
+Guidelines:
+1. Use precise radiology terminology (e.g., “hypodense lesion”, “well-circumscribed mass”).
+2. Do not speculate beyond the provided imaging findings.
+3. Clearly separate **observations (Findings)** from **clinical conclusions (Impression)**.
+4. Maintain concise, professional tone (avoid conversational language).
+5. If findings are ambiguous, describe them cautiously (e.g., “could represent”, “suggestive of”).
+6. Do not provide treatment recommendations — only describe imaging findings and possible impression.
+7. If critical or urgent findings are described (e.g., pneumothorax, intracranial bleed), clearly flag them in the Impression with “urgent finding”.
+
+Example output format:
+
+---
+**Clinical Indication:** [patient history or reason for exam]  
+**Technique:** [modality and method used]  
+**Findings:**  
+- [Objective imaging observations, organized by anatomy/system]  
+**Impression:**  
+- [Concise summary of key findings, differential if applicable, urgent findings highlighted]  
+---
+
+Tone:
+- Professional, clinical, concise.
+- Avoid hedging unless medically necessary.
+- Always prioritize patient safety and clarity."
+              disabled={!isEditing}
+            />
+          </div>
+
+          {/* User Input */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium">User *</span>
+              {isEditing && (
+                <div className="flex items-center space-x-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.docx,.pptx"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    multiple
+                    accept=".png,.jpg,.jpeg,.gif,.bmp"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-1 bg-slate-700 text-slate-300 rounded text-xs hover:bg-slate-600 transition-colors flex items-center"
+                  >
+                    <PaperClipIcon className="h-3 w-3 mr-1" />
+                    Add Docs
+                  </button>
+                  <button
+                    onClick={() => imageInputRef.current?.click()}
+                    className="px-3 py-1 bg-slate-700 text-slate-300 rounded text-xs hover:bg-slate-600 transition-colors flex items-center"
+                  >
+                    <svg className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Add Images
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Uploaded Files */}
+            {uploadedFiles.length > 0 && (
+              <div className="mb-4 p-3 bg-slate-800 rounded-lg border border-slate-700">
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-secondary">
-                    User Prompt *
-                  </label>
+                  <span className="text-xs text-slate-400">Attached documents ({uploadedFiles.length})</span>
                   {isEditing && (
                     <div className="flex items-center space-x-2">
                       <input
-                        type="file"
-                        multiple
-                        accept=".pdf,.docx,.pptx"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        id="file-upload"
+                        type="checkbox"
+                        id="includeFileContent"
+                        checked={includeFileContent}
+                        onChange={(e) => setIncludeFileContent(e.target.checked)}
+                        className="rounded border-slate-600 bg-slate-700 text-blue-500"
                       />
-                      <input
-                        type="file"
-                        multiple
-                        accept=".png,.jpg,.jpeg,.gif,.bmp"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                        id="image-upload"
-                      />
-                      <label
-                        htmlFor="file-upload"
-                        className="btn-secondary flex items-center text-xs py-2 px-3 cursor-pointer"
-                      >
-                        <PaperClipIcon className="h-3 w-3 mr-1" />
-                        Add Docs
-                      </label>
-                      <label
-                        htmlFor="image-upload"
-                        className="btn-secondary flex items-center text-xs py-2 px-3 cursor-pointer"
-                      >
-                        <svg className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        Add Images
+                      <label htmlFor="includeFileContent" className="text-xs text-slate-400">
+                        Include content
                       </label>
                     </div>
                   )}
                 </div>
-
-                {/* Uploaded Files List */}
-                {uploadedFiles.length > 0 && (
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-muted">Attached documents ({uploadedFiles.length})</span>
+                <div className="space-y-1">
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-slate-700 rounded border border-slate-600">
+                      <span className="text-xs text-slate-300">{file.name}</span>
                       {isEditing && (
-                        <div className="flex items-center space-x-2">
-                          <div className="flex items-center space-x-1">
-                            <input
-                              type="checkbox"
-                              id="includeFileContent"
-                              checked={includeFileContent}
-                              onChange={(e) => setIncludeFileContent(e.target.checked)}
-                              className="rounded border-slate-600 bg-slate-700 text-accent focus:ring-accent w-3 h-3"
-                            />
-                            <label htmlFor="includeFileContent" className="text-xs text-secondary">
-                              Include content
-                            </label>
-                          </div>
-                          {includeFileContent && (
-                            <input
-                              type="text"
-                              value={fileContentPrefix}
-                              onChange={(e) => setFileContentPrefix(e.target.value)}
-                              className="input-field text-xs py-1 px-2 w-32"
-                              placeholder="Prefix:"
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      {uploadedFiles.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-slate-700/30 rounded border border-slate-600/50">
-                          <div className="flex items-center space-x-2">
-                            <DocumentIcon className="h-3 w-3 text-accent" />
-                            <span className="text-xs text-primary">{file.name}</span>
-                            <span className="text-xs text-muted">({(file.size / 1024).toFixed(1)} KB)</span>
-                          </div>
-                          {isEditing && (
-                            <button
-                              onClick={() => removeFile(index)}
-                              className="text-muted hover:text-red-400 transition-colors"
-                            >
-                              <XMarkIcon className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Uploaded Images List */}
-                {uploadedImages.length > 0 && (
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-muted">Attached images ({uploadedImages.length})</span>
-                    </div>
-                    
-                    {selectedModel && !selectedModel.supports_vision && (
-                      <div className="mb-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                        <div className="flex items-start">
-                          <svg className="h-4 w-4 text-yellow-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                          </svg>
-                          <div className="text-xs text-yellow-300">
-                            <p className="font-medium">Vision Not Supported</p>
-                            <p className="mt-1">The selected model doesn't support vision.</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-2 gap-2">
-                      {uploadedImages.map((image, index) => (
-                        <div key={index} className="relative group">
-                          <img
-                            src={URL.createObjectURL(image)}
-                            alt={image.name}
-                            className="w-full h-20 object-cover rounded border border-slate-600/50"
-                          />
-                          {isEditing && (
-                            <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center">
-                              <button
-                                onClick={() => removeImage(index)}
-                                className="text-white hover:text-red-400 transition-colors"
-                              >
-                                <XMarkIcon className="h-4 w-4" />
-                              </button>
-                            </div>
-                          )}
-                          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white text-xs p-1 truncate">
-                            {image.name}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <textarea
-                  value={promptData.text}
-                  onChange={(e) => setPromptData(prev => ({ ...prev, text: e.target.value }))}
-                  className="input-field font-mono text-sm leading-relaxed"
-                  rows={20}
-                  placeholder="Enter your prompt here..."
-                  required
-                  disabled={!isEditing}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex space-x-3 mt-6 pt-4 border-t border-slate-700/50 px-6 pb-6">
-            
-            {isEditing ? (
-              <>
-                <button
-                  onClick={handleSavePrompt}
-                  disabled={saving || !promptData.title.trim() || !promptData.text.trim()}
-                  className="flex-1 btn-primary py-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {saving ? 'Saving...' : (isNewPrompt ? 'Create Prompt' : 'Save Changes')}
-                </button>
-                <button
-                  onClick={handleRunPrompt}
-                  disabled={
-                    loading || 
-                    !selectedProvider || 
-                    !selectedModel || 
-                    !promptData.text.trim() ||
-                    (uploadedImages.length > 0 && selectedModel && !selectedModel.supports_vision)
-                  }
-                  className="flex-1 btn-accent py-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <div className="flex items-center justify-center">
-                      <ArrowPathIcon className="h-4 w-4 animate-spin mr-2" />
-                      Running...
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center">
-                      <PlayIcon className="h-4 w-4 mr-2" />
-                      Run
-                    </div>
-                  )}
-                </button>
-                {output && (
-                  <button
-                    onClick={handleLockVersion}
-                    disabled={!currentPrompt || !output}
-                    className="flex-1 btn-success py-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <LockClosedIcon className="h-4 w-4 mr-2" />
-                    Lock Version
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={handleRunPrompt}
-                  disabled={
-                    loading || 
-                    !selectedProvider || 
-                    !selectedModel || 
-                    !promptData.text.trim() ||
-                    (uploadedImages.length > 0 && selectedModel && !selectedModel.supports_vision)
-                  }
-                  className="flex-1 btn-accent py-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <div className="flex items-center justify-center">
-                      <ArrowPathIcon className="h-4 w-4 animate-spin mr-2" />
-                      Running...
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center">
-                      <PlayIcon className="h-4 w-4 mr-2" />
-                      Run
-                    </div>
-                  )}
-                </button>
-                {output && (
-                  <button
-                    onClick={handleLockVersion}
-                    disabled={!currentPrompt || !output}
-                    className="flex-1 btn-success py-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <LockClosedIcon className="h-4 w-4 mr-2" />
-                    Lock Version
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-          </div>
-        </div>
-
-        {/* Right Panel - Output */}
-        <div className={`flex flex-col transition-all duration-300 ${expandedSection === 'prompt' ? 'w-1/4' : 'w-1/2'}`}>
-          <div className="flex-1 flex flex-col p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="heading-md text-primary">Output</h2>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setShowOutputModal(true)}
-                  className="p-2 text-slate-400 hover:text-accent transition-colors"
-                  title="Expand output"
-                >
-                  <ArrowsPointingOutIcon className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setExpandedSection(expandedSection === 'output' ? null : 'output')}
-                  className="p-2 text-slate-400 hover:text-accent transition-colors"
-                  title={expandedSection === 'output' ? 'Collapse' : 'Expand'}
-                >
-                  {expandedSection === 'output' ? 
-                    <ArrowsPointingInIcon className="h-4 w-4" /> : 
-                    <ArrowsPointingOutIcon className="h-4 w-4" />
-                  }
-                </button>
-              </div>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto">
-            
-            {!output ? (
-              <div className="text-center py-12">
-                <DocumentDuplicateIcon className="mx-auto h-12 w-12 text-muted" />
-                <h3 className="mt-2 text-sm font-medium text-secondary">No output yet</h3>
-                <p className="mt-1 text-sm text-muted">
-                  Run a prompt to see the output here.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4 animate-scale-in h-full flex flex-col">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-secondary">Response</h3>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-muted">
-                      Generated from: {promptData.title || 'Current Prompt'}
-                    </span>
-                    <button
-                      onClick={() => copyToClipboard(output.output_text)}
-                      className="text-sm text-accent hover:text-blue-200 transition-colors"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="flex-1 bg-slate-900/50 rounded-xl p-4 border border-slate-700/50 overflow-y-auto">
-                  <pre className="whitespace-pre-wrap text-sm text-slate-100 font-mono leading-relaxed">
-                    {output.output_text}
-                  </pre>
-                </div>
-
-                {/* Metadata */}
-                <div className="border-t border-slate-700/50 pt-4">
-                  <h4 className="text-sm font-medium text-secondary mb-2">Metadata</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    {output.latency_ms && (
-                      <div>
-                        <span className="text-muted">Latency:</span>
-                        <span className="ml-2 font-medium text-primary">{output.latency_ms.toFixed(2)}ms</span>
-                      </div>
-                    )}
-                    {output.cost_usd && (
-                      <div>
-                        <span className="text-muted">Cost:</span>
-                        <span className="ml-2 font-medium text-primary">${output.cost_usd.toFixed(4)}</span>
-                      </div>
-                    )}
-                    {output.token_usage && (
-                      <>
-                        <div>
-                          <span className="text-muted">Input Tokens:</span>
-                          <span className="ml-2 font-medium text-primary">{output.token_usage.input}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted">Output Tokens:</span>
-                          <span className="ml-2 font-medium text-primary">{output.token_usage.output}</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Versions */}
-          {showVersions && currentPrompt && (
-            <div className="card">
-              <div className="card-header">
-                <h2 className="heading-md text-primary">Version History</h2>
-              </div>
-              
-              {promptVersions.length === 0 ? (
-                <div className="text-center py-8">
-                  <ClockIcon className="mx-auto h-8 w-8 text-muted" />
-                  <p className="mt-2 text-sm text-muted">No versions yet</p>
-                  <p className="text-xs text-muted">Lock a version to see it here</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {promptVersions.map((version, index) => (
-                    <div key={version.id} className="p-3 bg-slate-700/30 rounded border border-slate-600/50">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-primary">
-                          Version {promptVersions.length - index}
-                        </span>
-                        <span className="text-xs text-muted">
-                          {new Date(version.created_at).toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="text-xs text-muted space-y-1">
-                        <div>Model: {version.model_name}</div>
-                        <div>Temperature: {version.temperature}</div>
-                        <div>Max Tokens: {version.max_tokens}</div>
-                        {version.files && version.files.length > 0 && (
-                          <div>Files: {version.files.length}</div>
-                        )}
-                        {version.images && version.images.length > 0 && (
-                          <div>Images: {version.images.length}</div>
-                        )}
-                      </div>
-                      {version.output && (
-                        <div className="mt-2">
-                          <button
-                            onClick={() => copyToClipboard(version.output.output_text)}
-                            className="text-xs text-accent hover:text-blue-200"
-                          >
-                            Copy Output
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => removeFile(index)}
+                          className="text-slate-400 hover:text-red-400"
+                        >
+                          <XMarkIcon className="h-3 w-3" />
+                        </button>
                       )}
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+              </div>
+            )}
 
-      {/* Versions Panel - Slides in from right when active */}
-      {showVersions && currentPrompt && (
-        <div className="absolute right-0 top-0 h-full w-80 bg-slate-900/95 border-l border-slate-700/50 shadow-2xl transform transition-transform duration-300 z-10">
-          <div className="p-6 h-full overflow-y-auto">
+            {/* Uploaded Images */}
+            {uploadedImages.length > 0 && (
+              <div className="mb-4 p-3 bg-slate-800 rounded-lg border border-slate-700">
+                <span className="text-xs text-slate-400 mb-2 block">Attached images ({uploadedImages.length})</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {uploadedImages.map((image, index) => (
+                    <div key={index} className="relative">
+                      <img
+                        src={URL.createObjectURL(image)}
+                        alt={image.name}
+                        className="w-full h-16 object-cover rounded"
+                      />
+                      {isEditing && (
+                        <button
+                          onClick={() => removeImage(index)}
+                          className="absolute top-1 right-1 text-white bg-red-500 rounded-full p-1"
+                        >
+                          <XMarkIcon className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <input
+              type="text"
+              value={promptData.text}
+              onChange={(e) => setPromptData(prev => ({ ...prev, text: e.target.value }))}
+              className="w-full px-4 py-3 border border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-slate-400 bg-slate-800"
+              placeholder="Enter your message here..."
+              disabled={!isEditing}
+            />
+          </div>
+
+          {/* Run Prompt Button */}
+          <div className="flex justify-center mb-8">
+            <button
+              onClick={handleRunPrompt}
+              disabled={loading || !selectedProvider || !selectedModel || !promptData.text.trim()}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <>
+                  <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                  <span>Running...</span>
+                </>
+              ) : (
+                <>
+                  <PlusIcon className="h-4 w-4" />
+                  <span>Run Prompt</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Output Section */}
+                      <div className="border-t border-slate-700 pt-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Output</h3>
+            {!output ? (
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-8 text-center">
+                <DocumentIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                <p className="text-slate-400">No output yet</p>
+              </div>
+            ) : (
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-white">Response</span>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => copyToClipboard(output.output_text)}
+                      className="text-blue-400 hover:text-blue-300 text-sm"
+                    >
+                      Copy
+                    </button>
+                    {output && (
+                      <button
+                        onClick={handleLockVersion}
+                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm flex items-center"
+                      >
+                        <LockClosedIcon className="h-3 w-3 mr-1" />
+                        Lock Version
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <pre className="whitespace-pre-wrap text-sm text-slate-200 font-mono">
+                  {output.output_text}
+                </pre>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Versions Panel - Slides in from right when active */}
+        {showVersions && currentPrompt && (
+          <div className="w-80 bg-slate-900 border-l border-slate-700 p-6 overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="heading-md text-primary">Version History</h2>
+              <h3 className="text-lg font-semibold text-white">Version History</h3>
               <button
                 onClick={() => setShowVersions(false)}
-                className="p-2 text-slate-400 hover:text-accent transition-colors"
+                className="text-slate-400 hover:text-white"
               >
                 <XMarkIcon className="h-5 w-5" />
               </button>
@@ -875,23 +765,23 @@ const PromptEditor = () => {
             
             {promptVersions.length === 0 ? (
               <div className="text-center py-8">
-                <ClockIcon className="mx-auto h-8 w-8 text-muted" />
-                <p className="mt-2 text-sm text-muted">No versions yet</p>
-                <p className="text-xs text-muted">Lock a version to see it here</p>
+                <ClockIcon className="mx-auto h-8 w-8 text-slate-400" />
+                <p className="mt-2 text-sm text-slate-400">No versions yet</p>
+                <p className="text-xs text-slate-500">Lock a version to see it here</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {promptVersions.map((version, index) => (
-                  <div key={version.id} className="p-3 bg-slate-700/30 rounded border border-slate-600/50">
+                  <div key={version.id} className="p-3 bg-slate-800 rounded border border-slate-700">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-primary">
+                      <span className="text-sm font-medium text-white">
                         Version {promptVersions.length - index}
                       </span>
-                      <span className="text-xs text-muted">
+                      <span className="text-xs text-slate-400">
                         {new Date(version.created_at).toLocaleString()}
                       </span>
                     </div>
-                    <div className="text-xs text-muted space-y-1">
+                    <div className="text-xs text-slate-400 space-y-1">
                       <div>Model: {version.model_name}</div>
                       <div>Temperature: {version.temperature}</div>
                       <div>Max Tokens: {version.max_tokens}</div>
@@ -902,271 +792,29 @@ const PromptEditor = () => {
                         <div>Images: {version.images.length}</div>
                       )}
                     </div>
-                    {version.output && (
-                      <div className="mt-2">
+                    <div className="mt-2 flex space-x-2">
+                      <button
+                        onClick={() => loadVersion(version)}
+                        className="text-xs text-blue-400 hover:text-blue-300"
+                      >
+                        Load Version
+                      </button>
+                      {version.output && (
                         <button
                           onClick={() => copyToClipboard(version.output.output_text)}
-                          className="text-xs text-accent hover:text-blue-200"
+                          className="text-xs text-green-400 hover:text-green-300"
                         >
                           Copy Output
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Modals */}
-      {/* Model Configuration Modal */}
-      {showModelConfigModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="heading-md text-primary">Model Configuration</h2>
-              <button
-                onClick={() => setShowModelConfigModal(false)}
-                className="p-2 text-slate-400 hover:text-accent transition-colors"
-              >
-                <XMarkIcon className="h-5 w-5" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-2">
-                  Provider
-                </label>
-                <select
-                  value={selectedProvider?.id || ''}
-                  onChange={(e) => handleProviderChange(e.target.value)}
-                  className="input-field w-full"
-                  disabled={providers.length === 0 || !isEditing}
-                >
-                  <option value="">Select Provider</option>
-                  {providers.map((provider) => (
-                    <option key={provider.id} value={provider.id}>
-                      {provider.name.charAt(0).toUpperCase() + provider.name.slice(1)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-2">
-                  Model
-                </label>
-                <select
-                  value={selectedModel?.id || ''}
-                  onChange={(e) => handleModelChange(e.target.value)}
-                  className="input-field w-full"
-                  disabled={!selectedProvider || models.length === 0 || !isEditing}
-                >
-                  <option value="">Select Model</option>
-                  {models
-                    .filter(model => !selectedProvider || model.provider_id === selectedProvider.id)
-                    .sort((a, b) => {
-                      if (uploadedImages.length > 0) {
-                        if (a.supports_vision && !b.supports_vision) return -1;
-                        if (!a.supports_vision && b.supports_vision) return 1;
-                      }
-                      return a.name.localeCompare(b.name);
-                    })
-                    .map((model) => (
-                      <option key={model.id} value={model.id}>
-                        {model.name} {model.supports_vision ? '(Vision)' : ''}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              {selectedModel && (
-                <div className="p-4 bg-slate-700/30 rounded-xl border border-slate-600/50">
-                  <div className="flex items-start">
-                    <InformationCircleIcon className="h-5 w-5 text-accent mt-0.5 mr-2" />
-                    <div className="text-sm text-secondary">
-                      <p className="font-medium text-primary">{selectedModel.name}</p>
-                      {selectedModel.description && (
-                        <p className="mt-1">{selectedModel.description}</p>
-                      )}
-                      {selectedModel.context_length && (
-                        <p className="mt-1">Context length: {selectedModel.context_length.toLocaleString()} tokens</p>
-                      )}
-                      {selectedModel.supports_vision && (
-                        <p className="mt-1 text-emerald-400">
-                          <span className="inline-flex items-center">
-                            <span className="w-2 h-2 bg-emerald-400 rounded-full mr-2"></span>
-                            Supports Vision
-                          </span>
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Prompt Modal */}
-      {showPromptModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-4xl mx-4 h-5/6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="heading-md text-primary">Prompt Editor</h2>
-              <button
-                onClick={() => setShowPromptModal(false)}
-                className="p-2 text-slate-400 hover:text-accent transition-colors"
-              >
-                <XMarkIcon className="h-5 w-5" />
-              </button>
-            </div>
-            
-            <div className="h-full flex flex-col space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-2">
-                  Title *
-                </label>
-                <input
-                  type="text"
-                  value={promptData.title}
-                  onChange={(e) => setPromptData({...promptData, title: e.target.value})}
-                  placeholder="Enter prompt title"
-                  className="input-field w-full"
-                  disabled={!isEditing}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-2">
-                  System Prompt (Optional)
-                </label>
-                <textarea
-                  value={promptData.system_prompt}
-                  onChange={(e) => setPromptData({...promptData, system_prompt: e.target.value})}
-                  placeholder="Enter system prompt..."
-                  rows={4}
-                  className="input-field w-full resize-none"
-                  disabled={!isEditing}
-                />
-              </div>
-
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-secondary mb-2">
-                  User Prompt *
-                </label>
-                <textarea
-                  value={promptData.text}
-                  onChange={(e) => setPromptData({...promptData, text: e.target.value})}
-                  placeholder="Enter your prompt..."
-                  className="input-field w-full resize-none h-full"
-                  disabled={!isEditing}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-secondary mb-2">
-                    Temperature
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    value={promptData.temperature}
-                    onChange={(e) => setPromptData({...promptData, temperature: parseFloat(e.target.value)})}
-                    className="input-field w-full"
-                    disabled={!isEditing}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-secondary mb-2">
-                    Max Tokens
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="4000"
-                    value={promptData.max_tokens}
-                    onChange={(e) => setPromptData({...promptData, max_tokens: parseInt(e.target.value)})}
-                    className="input-field w-full"
-                    disabled={!isEditing}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Output Modal */}
-      {showOutputModal && output && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-4xl mx-4 h-5/6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="heading-md text-primary">Output Viewer</h2>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => copyToClipboard(output.output_text)}
-                  className="text-sm text-accent hover:text-blue-200 transition-colors"
-                >
-                  Copy
-                </button>
-                <button
-                  onClick={() => setShowOutputModal(false)}
-                  className="p-2 text-slate-400 hover:text-accent transition-colors"
-                >
-                  <XMarkIcon className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-            
-            <div className="h-full flex flex-col space-y-4">
-              <div className="flex-1 bg-slate-900/50 rounded-xl p-4 border border-slate-700/50 overflow-y-auto">
-                <pre className="whitespace-pre-wrap text-sm text-slate-100 font-mono">
-                  {output.output_text}
-                </pre>
-              </div>
-
-              <div className="border-t border-slate-700/50 pt-4">
-                <h4 className="text-sm font-medium text-secondary mb-2">Metadata</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  {output.latency_ms && (
-                    <div>
-                      <span className="text-muted">Latency:</span>
-                      <span className="ml-2 font-medium text-primary">{output.latency_ms.toFixed(2)}ms</span>
-                    </div>
-                  )}
-                  {output.cost_usd && (
-                    <div>
-                      <span className="text-muted">Cost:</span>
-                      <span className="ml-2 font-medium text-primary">${output.cost_usd.toFixed(4)}</span>
-                    </div>
-                  )}
-                  {output.token_usage && (
-                    <>
-                      <div>
-                        <span className="text-muted">Input Tokens:</span>
-                        <span className="ml-2 font-medium text-primary">{output.token_usage.input}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted">Output Tokens:</span>
-                        <span className="ml-2 font-medium text-primary">{output.token_usage.output}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

@@ -113,6 +113,23 @@ export const PromptProvider = ({ children }) => {
     }
   }, [fetchPromptVersions]);
 
+  const createAndLockPrompt = useCallback(async (versionData) => {
+    try {
+      setSaving(true);
+      const response = await api.post('/api/prompts/create-and-lock', versionData);
+      await fetchPrompts();
+      toast.success('Prompt created and version locked successfully!');
+      return response.data;
+    } catch (error) {
+      console.error('Error creating and locking prompt:', error);
+      const errorMessage = error.response?.data?.detail || 'Failed to create and lock prompt';
+      toast.error(errorMessage);
+      throw error;
+    } finally {
+      setSaving(false);
+    }
+  }, [fetchPrompts]);
+
   const runPrompt = useCallback(async (promptData) => {
     try {
       setLoading(true);
@@ -168,6 +185,7 @@ export const PromptProvider = ({ children }) => {
     createPrompt,
     updatePrompt,
     lockPromptVersion,
+    createAndLockPrompt,
     runPrompt,
     deletePrompt,
     duplicatePrompt,

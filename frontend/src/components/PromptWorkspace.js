@@ -290,6 +290,35 @@ const PromptWorkspace = () => {
     toast.success('Copied to clipboard!');
   };
 
+  const loadVersion = (version) => {
+    // Populate the prompt editor with the selected version data
+    setPromptData({
+      title: version.title || currentPrompt?.title || '',
+      text: version.prompt_text || '',
+      system_prompt: version.system_prompt || '',
+      temperature: version.temperature || 0.7,
+      max_tokens: version.max_tokens || 1000,
+    });
+    
+    // Set the output if available
+    if (version.output) {
+      setOutput(version.output);
+    }
+    
+    // Set files and images if available
+    if (version.files) {
+      setUploadedFiles(version.files);
+    }
+    if (version.images) {
+      setUploadedImages(version.images);
+    }
+    
+    // Enable editing mode
+    setIsEditing(true);
+    
+    toast.success('Version loaded into editor!');
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -894,16 +923,22 @@ const PromptWorkspace = () => {
                             <div>Images: {version.images.length}</div>
                           )}
                         </div>
-                        {version.output && (
-                          <div className="mt-2">
+                        <div className="mt-2 flex space-x-2">
+                          <button
+                            onClick={() => loadVersion(version)}
+                            className="text-xs text-accent hover:text-blue-200"
+                          >
+                            Load Version
+                          </button>
+                          {version.output && (
                             <button
                               onClick={() => copyToClipboard(version.output.output_text)}
-                              className="text-xs text-accent hover:text-blue-200"
+                              className="text-xs text-green-400 hover:text-green-300"
                             >
                               Copy Output
                             </button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
