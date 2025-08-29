@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.database.connection import get_db
-from app.database.models import Provider, Model
+from app.database.models import Provider, Model, Prompt
 from app.schemas.provider_schemas import (
     ProviderCreate, ProviderResponse, ModelResponse, ApiKeyUpdate
 )
@@ -22,6 +22,10 @@ async def add_provider(
     This endpoint validates the API key and automatically fetches available models.
     """
     try:
+        print(f"Adding provider: {provider_data.name}")
+        print(f"API key length: {len(provider_data.api_key)}")
+        print(f"API key starts with: {provider_data.api_key[:10]}...")
+        
         service = ProviderService(db)
         provider = await service.add_provider(
             name=provider_data.name.lower(), 
@@ -42,8 +46,12 @@ async def add_provider(
         
         return response_dict
     except ValueError as e:
+        print(f"ValueError in add_provider: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        print(f"Exception in add_provider: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to add provider: {str(e)}")
 
 @router.put("/providers/{provider_name}/api-key")

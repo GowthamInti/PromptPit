@@ -349,6 +349,7 @@ async def run_prompt(
     max_tokens: Optional[int] = Form(1000),
     include_file_content: Optional[bool] = Form(True),
     file_content_prefix: Optional[str] = Form("File content:\n"),
+    knowledge_base_id: Optional[int] = Form(None),
     files: List[UploadFile] = File(default=[]),
     images: List[UploadFile] = File(default=[]),
     db: Session = Depends(get_db)
@@ -357,11 +358,11 @@ async def run_prompt(
     Run a prompt against a specified model and return the output.
     
     This endpoint executes a prompt and returns the generated output with metadata.
-    Supports file uploads for enhanced prompt context.
+    Supports file uploads and RAG (Retrieval-Augmented Generation) with knowledge bases.
     """
     try:
         # Log basic request info
-        print(f"Processing request: provider_id={provider_id}, model_id={model_id}, files={len(files) if files else 0}, images={len(images) if images else 0}")
+        print(f"Processing request: provider_id={provider_id}, model_id={model_id}, files={len(files) if files else 0}, images={len(images) if images else 0}, knowledge_base_id={knowledge_base_id}")
         # Validate provider and model exist
         provider = db.query(Provider).filter(Provider.id == provider_id).first()
         if not provider:
@@ -377,6 +378,48 @@ async def run_prompt(
             prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
             if not prompt:
                 raise HTTPException(status_code=404, detail="Prompt not found")
+        
+        # RAG: Search knowledge base if provided
+        rag_context = ""
+        rag_results = []
+        if knowledge_base_id:
+            try:
+                from app.services.knowledge_base_service import KnowledgeBaseService
+                kb_service = KnowledgeBaseService(db)
+                
+                # Search the knowledge base for relevant context
+                search_results = await kb_service.search_knowledge_base(
+                    kb_id=knowledge_base_id,
+                    query=text,
+                    n_results=5  # Top 5 most relevant results
+                )
+                
+                # Format the context from search results
+                if search_results.get('results'):
+                    context_parts = []
+                    for i, result in enumerate(search_results['results'][:5], 1):
+                        context_parts.append(f"Context {i}:\n{result.get('document', '')}")
+                        rag_results.append({
+                            "content": result.get('document', ''),
+                            "metadata": result.get('metadata', {}),
+                            "score": result.get('distance', 0)
+                        })
+                    rag_context = "\n\n".join(context_parts)
+                    
+                    # Enhance the prompt with RAG context
+                    if rag_context:
+                        enhanced_text = f"""Based on the following context information:
+
+{rag_context}
+
+Question: {text}
+
+Please answer the question using the provided context. If the context doesn't contain enough information to answer the question, please say so."""
+                        text = enhanced_text
+                        
+            except Exception as e:
+                print(f"RAG search error: {str(e)}")
+                # Continue without RAG context if search fails
         
         # Execute the prompt using the provider service
         start_time = time.time()
@@ -426,7 +469,9 @@ async def run_prompt(
                 'latency_ms': latency_ms,
                 'token_usage': result.get('token_usage', {}),
                 'cost_usd': result.get('cost', 0.0),
-                'response_metadata': result.get('response_metadata', {})
+                'response_metadata': result.get('response_metadata', {}),
+                'rag_context': rag_context if rag_context else None,
+                'rag_results': rag_results if rag_results else None
             }
             
             # Only save to database if we have a prompt_id
@@ -451,6 +496,8 @@ async def run_prompt(
                     "token_usage": output_data['token_usage'],
                     "cost_usd": output_data['cost_usd'],
                     "response_metadata": output_data['response_metadata'],
+                    "rag_context": output_data['rag_context'],
+                    "rag_results": output_data['rag_results'],
                     "created_at": datetime.utcnow().isoformat()
                 }
             
@@ -494,6 +541,71 @@ def get_output(
     return OutputResponse.from_orm(output)
 
 
+
+@router.post("/rag-preview")
+async def rag_preview(
+    knowledge_base_id: int = Form(...),
+    query: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Preview RAG context that would be retrieved for a given query and knowledge base.
+    This allows users to see what context will be used before running the actual prompt.
+    """
+    try:
+        from app.services.knowledge_base_service import KnowledgeBaseService
+        kb_service = KnowledgeBaseService(db)
+        
+        # Validate knowledge base exists
+        kb = await kb_service.get_knowledge_base(knowledge_base_id)
+        if not kb:
+            raise HTTPException(status_code=404, detail="Knowledge base not found")
+        
+        # Search the knowledge base for relevant context
+        search_results = await kb_service.search_knowledge_base(
+            kb_id=knowledge_base_id,
+            query=query,
+            n_results=5  # Top 5 most relevant results
+        )
+        
+        # Format the results
+        rag_results = []
+        context_parts = []
+        
+        if search_results.get('results'):
+            for i, result in enumerate(search_results['results'][:5], 1):
+                content = result.get('document', '')
+                context_parts.append(f"Context {i}:\n{content}")
+                rag_results.append({
+                    "content": content,
+                    "metadata": result.get('metadata', {}),
+                    "score": result.get('distance', 0),
+                    "source": result.get('metadata', {}).get('original_filename', 'Unknown')
+                })
+        
+        rag_context = "\n\n".join(context_parts)
+        
+        # Show enhanced prompt preview
+        enhanced_prompt = f"""Based on the following context information:
+
+{rag_context}
+
+Question: {query}
+
+Please answer the question using the provided context. If the context doesn't contain enough information to answer the question, please say so."""
+
+        return {
+            "knowledge_base_name": kb.get('name', 'Unknown'),
+            "query": query,
+            "rag_context": rag_context,
+            "enhanced_prompt": enhanced_prompt,
+            "results": rag_results,
+            "results_count": len(rag_results)
+        }
+        
+    except Exception as e:
+        print(f"RAG preview error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to preview RAG context: {str(e)}")
 
 @router.get("/supported-file-types")
 async def get_supported_file_types():

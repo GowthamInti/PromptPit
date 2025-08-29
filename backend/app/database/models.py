@@ -174,3 +174,41 @@ class ModelCard(Base):
     experiment_ids = Column(JSON)  # [1, 2, 3] - References to experiments included
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class KnowledgeBase(Base):
+    __tablename__ = "knowledge_bases"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    uuid = Column(String(36), unique=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    user_id = Column(String(100), default="default_user")
+    chroma_collection_name = Column(String(255), unique=True)  # ChromaDB collection name
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    contents = relationship("KnowledgeBaseContent", back_populates="knowledge_base", cascade="all, delete-orphan")
+
+class KnowledgeBaseContent(Base):
+    __tablename__ = "knowledge_base_contents"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    knowledge_base_id = Column(Integer, ForeignKey("knowledge_bases.id"), nullable=False)
+    content_type = Column(String(50), nullable=False)  # 'document', 'image', 'summary'
+    original_filename = Column(String(255), nullable=False)
+    file_path = Column(String(500))  # Path to stored file
+    file_size = Column(Integer)  # File size in bytes
+    mime_type = Column(String(100))  # MIME type of the file
+    extracted_text = Column(Text)  # Extracted text content
+    summary = Column(Text)  # LLM-generated summary
+    content_metadata = Column(JSON)  # Additional metadata (page count, dimensions, etc.)
+    chroma_document_id = Column(String(255))  # ChromaDB document ID
+    processing_status = Column(String(20), default='pending')  # 'pending', 'processing', 'completed', 'failed'
+    processing_error = Column(Text)  # Error message if processing failed
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    knowledge_base = relationship("KnowledgeBase", back_populates="contents")

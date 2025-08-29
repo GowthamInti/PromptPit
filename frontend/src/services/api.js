@@ -152,31 +152,63 @@ export const apiService = {
   getPromptOutputs: (promptId) => api.get(`/api/prompts/${promptId}/outputs`),
   getOutput: (outputId) => api.get(`/api/outputs/${outputId}`),
   
-  // Judge endpoints
-  runJudge: (data) => api.post('/api/judge', data),
-  getEvaluations: (params) => api.get('/api/evaluations', { params }),
-  getEvaluation: (id) => api.get(`/api/evaluations/${id}`),
-  getOutputEvaluations: (outputId) => api.get(`/api/outputs/${outputId}/evaluations`),
-  
-  // Experiment endpoints
-  getExperiments: (params) => api.get('/api/experiments', { params }),
-  getExperiment: (id) => api.get(`/api/experiments/${id}`),
-  createExperiment: (data) => api.post('/api/experiments', data),
-  updateExperiment: (id, data) => api.put(`/api/experiments/${id}`, data),
-  deleteExperiment: (id) => api.delete(`/api/experiments/${id}`),
-  startExperiment: (id) => api.post(`/api/experiments/${id}/start`),
-  addOptimizationCycle: (experimentId, data) => api.post(`/api/experiments/${experimentId}/cycles`, data),
-  getOptimizationCycles: (experimentId) => api.get(`/api/experiments/${experimentId}/cycles`),
-  
-  // Model Card endpoints
-  getModelCards: (params) => api.get('/api/model-cards', { params }),
-  getModelCard: (id) => api.get(`/api/model-cards/${id}`),
-  createModelCard: (data) => api.post('/api/model-cards', data),
-  updateModelCard: (id, data) => api.put(`/api/model-cards/${id}`, data),
-  deleteModelCard: (id) => api.delete(`/api/model-cards/${id}`),
-  generateModelCard: (data) => api.post('/api/model-cards/generate', data),
-  exportModelCard: (id, format) => api.post(`/api/model-cards/${id}/export`, null, { params: { format } }),
-  publishModelCard: (id) => api.post(`/api/model-cards/${id}/publish`),
+  // Knowledge Base endpoints
+  getKnowledgeBases: () => api.get('/api/knowledge-bases'),
+  createKnowledgeBase: (data) => api.post('/api/knowledge-bases', data),
+  deleteKnowledgeBase: (kbId) => api.delete(`/api/knowledge-bases/${kbId}`),
+  getKnowledgeBaseContents: (kbId) => api.get(`/api/knowledge-bases/${kbId}/contents`),
+  uploadFilesToKnowledgeBase: (kbId, formData) => api.post(`/api/knowledge-bases/${kbId}/upload`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  addTextToKnowledgeBase: (kbId, data) => api.post(`/api/knowledge-bases/${kbId}/text`, data),
+  processKnowledgeBaseFiles: (kbId) => api.post(`/api/knowledge-bases/${kbId}/process`),
+  getKnowledgeBaseContent: (kbId, contentId) => api.get(`/api/knowledge-bases/${kbId}/contents/${contentId}`),
+  deleteKnowledgeBaseContent: (kbId, contentId) => api.delete(`/api/knowledge-bases/${kbId}/contents/${contentId}`),
+  updateContentSummary: (contentId, data) => api.put(`/api/knowledge-bases/contents/${contentId}/summary`, data),
+  processContentWithLLM: (kbId, contentId, data) => api.post(`/api/knowledge-bases/${kbId}/contents/${contentId}/process`, data),
+  runLLMWithFiles: (data) => {
+    const formData = new FormData();
+    
+    // Add all the data with proper type conversion
+    Object.keys(data).forEach(key => {
+      if (key !== 'files' && key !== 'images') {
+        let value = data[key];
+        // Convert boolean to string for FormData
+        if (typeof value === 'boolean') {
+          value = value.toString();
+        }
+        // Convert numbers to string for FormData
+        if (typeof value === 'number') {
+          value = value.toString();
+        }
+        // Handle null/undefined values
+        if (value === null || value === undefined) {
+          value = '';
+        }
+        formData.append(key, value);
+      }
+    });
+    
+    // Add files if present
+    if (data.files && data.files.length > 0) {
+      data.files.forEach(file => {
+        formData.append('files', file);
+      });
+    }
+
+    // Add images if present
+    if (data.images && data.images.length > 0) {
+      data.images.forEach(image => {
+        formData.append('images', image);
+      });
+    }
+    
+    return api.post('/api/run', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
   
   // Health check 
   healthCheck: () => api.get('/api/health'),

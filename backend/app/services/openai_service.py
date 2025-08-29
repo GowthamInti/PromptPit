@@ -4,11 +4,33 @@ import openai
 from sqlalchemy.orm import Session
 from app.database.models import Provider, Model
 import time
+import os
 
 class OpenAIService:
     def __init__(self, db: Session):
         self.db = db
         self.provider_name = "openai"
+
+    def _create_openai_client(self, api_key: str):
+        """Create OpenAI client with proxy environment handling"""
+        # Clear any proxy environment variables that might interfere
+        env_vars_to_clear = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy']
+        original_env = {}
+        
+        for var in env_vars_to_clear:
+            if var in os.environ:
+                original_env[var] = os.environ[var]
+                del os.environ[var]
+        
+        try:
+            client = openai.AsyncOpenAI(api_key=api_key)
+            return client
+        except Exception as e:
+            raise
+        finally:
+            # Restore original environment variables
+            for var, value in original_env.items():
+                os.environ[var] = value
 
     async def add_provider(self, api_key: str) -> Provider:
         """Add OpenAI provider with API key validation"""
@@ -90,16 +112,43 @@ class OpenAIService:
 
     async def _validate_api_key(self, api_key: str):
         """Validate OpenAI API key"""
+        # Basic API key format validation
+        if not api_key or not api_key.strip():
+            raise ValueError("API key cannot be empty")
+        
+        if not api_key.startswith("sk-"):
+            raise ValueError("OpenAI API key must start with 'sk-'")
+        
+        if len(api_key) < 20:
+            raise ValueError("API key appears to be too short")
+        
         try:
-            client = openai.AsyncOpenAI(api_key=api_key)
-            await client.models.list()
+            client = self._create_openai_client(api_key)
+            models = await client.models.list()
+                
         except Exception as e:
-            raise ValueError(f"Invalid OpenAI API key: {str(e)}")
+            # Check if it's a proxies error and provide a more helpful message
+            if "proxies" in str(e):
+                raise ValueError(f"Invalid OpenAI API key: Configuration error - please check your environment settings")
+            elif "authentication" in str(e).lower() or "invalid" in str(e).lower():
+                raise ValueError(f"Invalid OpenAI API key: Please check your API key and ensure it's valid")
+            elif "rate limit" in str(e).lower():
+                raise ValueError(f"OpenAI rate limit exceeded: Please try again later")
+            elif "quota" in str(e).lower():
+                raise ValueError(f"OpenAI quota exceeded: Please check your account billing")
+            else:
+                raise ValueError(f"Invalid OpenAI API key: {str(e)}")
 
     async def _fetch_models(self, api_key: str) -> List[Dict]:
         """Fetch available models from OpenAI API"""
-        client = openai.AsyncOpenAI(api_key=api_key)
-        models = await client.models.list()
+        try:
+            client = self._create_openai_client(api_key)
+            models = await client.models.list()
+        except Exception as e:
+            if "proxies" in str(e):
+                raise ValueError(f"Configuration error: {str(e)}")
+            else:
+                raise ValueError(f"Failed to fetch models: {str(e)}")
 
         # Vision-capable models from OpenAI
         vision_models = {
@@ -122,7 +171,13 @@ class OpenAIService:
 
     async def _run_prompt(self, api_key: str, prompt_data: Dict) -> Dict:
         """Execute prompt using OpenAI API"""
-        client = openai.AsyncOpenAI(api_key=api_key)
+        try:
+            client = self._create_openai_client(api_key)
+        except Exception as e:
+            if "proxies" in str(e):
+                raise ValueError(f"Configuration error: {str(e)}")
+            else:
+                raise ValueError(f"Failed to initialize OpenAI client: {str(e)}")
 
         messages = []
         if prompt_data.get("system_prompt"):

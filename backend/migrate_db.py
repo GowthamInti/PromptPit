@@ -35,8 +35,8 @@ def create_tables():
                    # Verify tables exist
         with engine.connect() as conn:
             tables = [
-                'providers', 'models', 'prompts', 'outputs', 'evaluations',
-                'experiments', 'optimization_cycles', 'model_cards', 'prompt_versions'
+                'providers', 'models', 'prompts', 'outputs', 'prompt_versions',
+                'knowledge_bases', 'knowledge_base_contents'
             ]
             
             for table in tables:

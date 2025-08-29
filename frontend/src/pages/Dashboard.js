@@ -4,8 +4,6 @@ import {
   PlusIcon, 
   ArrowRightIcon,
   SparklesIcon,
-  BeakerIcon,
-  DocumentIcon,
   TrashIcon,
   KeyIcon,
   EllipsisVerticalIcon,
@@ -13,14 +11,12 @@ import {
 } from '@heroicons/react/24/outline';
 import { useProviders } from '../contexts/ProviderContext';
 import AddProviderModal from '../components/AddProviderModal';
-import SidebarDemo from '../components/SidebarDemo';
 
 const Dashboard = () => {
   const { providers, models, loading, addProvider, refreshModels, updateApiKey, deactivateProvider, clearApiKey, permanentlyDeleteProvider } = useProviders();
   const [showAddProvider, setShowAddProvider] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
-  const [showSidebarDemo, setShowSidebarDemo] = useState(false);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -54,22 +50,6 @@ const Dashboard = () => {
       icon: SparklesIcon,
       color: 'bg-blue-500',
       iconColor: 'text-blue-400',
-    },
-    {
-      name: 'Start Experiment',
-      description: 'Create advanced experiments with style adaptation and optimization',
-      href: '/experiments',
-      icon: BeakerIcon,
-      color: 'bg-purple-500',
-      iconColor: 'text-purple-400',
-    },
-    {
-      name: 'Model Cards',
-      description: 'Generate and export experiment summaries',
-      href: '/model-cards',
-      icon: DocumentIcon,
-      color: 'bg-emerald-500',
-      iconColor: 'text-emerald-400',
     },
   ];
 
@@ -162,7 +142,7 @@ const Dashboard = () => {
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
-                <BeakerIcon className="h-8 w-8 text-purple-400" />
+                <SparklesIcon className="h-8 w-8 text-purple-400" />
               </div>
             </div>
             <div className="ml-4">
@@ -172,33 +152,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="card group hover:shadow-lg transition-all duration-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                <BeakerIcon className="h-8 w-8 text-emerald-400" />
-              </div>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-muted">Experiments</p>
-              <p className="text-3xl font-bold text-primary">0</p>
-            </div>
-          </div>
-        </div>
 
-        <div className="card group hover:shadow-lg transition-all duration-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                <DocumentIcon className="h-8 w-8 text-blue-400" />
-              </div>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-muted">Model Cards</p>
-              <p className="text-3xl font-bold text-primary">0</p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Quick Actions */}
@@ -228,22 +182,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Sidebar Demo Section */}
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="heading-md text-primary">🎯 New Collapsible Sidebar</h2>
-          <button
-            onClick={() => setShowSidebarDemo(!showSidebarDemo)}
-            className="btn-secondary text-sm py-2 px-4"
-          >
-            {showSidebarDemo ? 'Hide Demo' : 'Show Demo'}
-          </button>
-        </div>
-        
-        {showSidebarDemo && (
-          <SidebarDemo />
-        )}
-      </div>
+
 
       {/* Provider Management */}
       <div>

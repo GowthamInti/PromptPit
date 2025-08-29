@@ -7,7 +7,7 @@ import os
 
 from app.database.connection import get_db, engine
 from app.database import models
-from app.api import providers, prompts
+from app.api import providers, prompts, knowledge_bases
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
@@ -22,18 +22,16 @@ app = FastAPI(
     
     * 🤖 **Multi-Provider Support**: OpenAI, Groq, and more
     * 📝 **Prompt Management**: Save, version, and organize your prompts
-    * ⚖️ **Judge LLM Evaluation**: Automated quality scoring
+    * 📚 **Knowledge Base**: Create and manage document collections with vector search
     * 📊 **Performance Tracking**: Latency, tokens, costs
-    * 🧪 **Experiments**: Create and manage optimization experiments
-    * 📋 **Model Cards**: Generate shareable experiment summaries
+    * 🔄 **Version Control**: Lock and manage prompt versions
     
     ## Quick Start
     
     1. **Add Provider**: `POST /api/providers` with your API key
     2. **Run Prompt**: `POST /api/run` to execute against any model
-    3. **Evaluate**: `POST /api/judge` to score outputs
-    4. **Create Experiment**: `POST /api/experiments` for optimization
-    5. **Generate Model Card**: `POST /api/model-cards/generate` for summaries
+    3. **Create Knowledge Base**: `POST /api/knowledge-bases` for document management
+    4. **Upload & Process**: Add documents and process with LLM
     
     ## Supported Providers
     
@@ -58,19 +56,11 @@ app = FastAPI(
         },
         {
             "name": "prompts", 
-            "description": "Create, run, and manage prompts. Core functionality for prompt execution."
+            "description": "Create, run, and manage prompts. Core functionality for prompt execution and versioning."
         },
         {
-            "name": "judge",
-            "description": "Evaluate outputs using judge LLMs. Score and provide feedback on responses."
-        },
-        {
-            "name": "experiments",
-            "description": "Create and manage optimization experiments with iterative refinement cycles."
-        },
-        {
-            "name": "model-cards",
-            "description": "Generate and manage model cards for experiment summaries and sharing."
+            "name": "knowledge-bases",
+            "description": "Create and manage knowledge bases with document upload, processing, and vector search."
         }
     ]
 )
@@ -87,6 +77,7 @@ app.add_middleware(
 # Include API routes
 app.include_router(providers.router, prefix="/api", tags=["providers"])
 app.include_router(prompts.router, prefix="/api", tags=["prompts"])
+app.include_router(knowledge_bases.router, prefix="/api", tags=["knowledge-bases"])
 
 # Health check with detailed info
 @app.get("/api/health", tags=["health"])
@@ -104,8 +95,7 @@ async def health_check(db: Session = Depends(get_db)):
         # Get basic stats
         provider_count = db.query(models.Provider).count()
         prompt_count = db.query(models.Prompt).count()
-        experiment_count = db.query(models.Experiment).count()
-        model_card_count = db.query(models.ModelCard).count()
+        knowledge_base_count = db.query(models.KnowledgeBase).count()
         
         return {
             "status": "healthy",
@@ -114,8 +104,7 @@ async def health_check(db: Session = Depends(get_db)):
             "stats": {
                 "providers": provider_count,
                 "prompts": prompt_count,
-                "experiments": experiment_count,
-                "model_cards": model_card_count
+                "knowledge_bases": knowledge_base_count
             }
         }
     except Exception as e:

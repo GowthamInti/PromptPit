@@ -36,7 +36,8 @@ const PromptWorkspace = () => {
     lockPromptVersion,
     runPrompt,
     deletePrompt,
-    duplicatePrompt
+    duplicatePrompt,
+    deletePromptVersion
   } = usePrompts();
 
   const [promptData, setPromptData] = useState({
@@ -55,6 +56,8 @@ const PromptWorkspace = () => {
   const [showVersions, setShowVersions] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
+
+
   // Load current prompt data when selected
   useEffect(() => {
     if (currentPrompt) {
@@ -66,9 +69,22 @@ const PromptWorkspace = () => {
         max_tokens: currentPrompt.max_tokens || 1000,
       });
       setUploadedFiles(currentPrompt.files || []);
-      setUploadedImages(currentPrompt.images || []);
+      // Handle images - they might be metadata objects from database, not File objects
+      const images = currentPrompt.images || [];
+      const validImages = images.filter(img => img && (img instanceof File || (img.name || img.filename)));
+      setUploadedImages(validImages);
       setOutput(currentPrompt.last_output || null);
       setIsEditing(false);
+      
+      // Load versions for this prompt
+      if (currentPrompt.id) {
+        console.log('Loading versions for prompt:', currentPrompt.id, 'Version count:', currentPrompt.versions_count);
+        fetchPromptVersions(currentPrompt.id);
+        // Show versions panel if the prompt has versions
+        if (currentPrompt.versions_count > 0) {
+          setShowVersions(true);
+        }
+      }
     } else {
       // Reset to default state
       setPromptData({
@@ -208,6 +224,8 @@ const PromptWorkspace = () => {
     }
   };
 
+
+
   const handleRunPrompt = async () => {
     if (!selectedProvider || !selectedModel) {
       toast.error('Please select a provider and model');
@@ -231,6 +249,8 @@ const PromptWorkspace = () => {
         include_file_content: includeFileContent,
         file_content_prefix: fileContentPrefix,
       };
+
+
 
       if (uploadedFiles.length > 0 && includeFileContent) {
         requestData.files = uploadedFiles;
@@ -310,13 +330,29 @@ const PromptWorkspace = () => {
       setUploadedFiles(version.files);
     }
     if (version.images) {
-      setUploadedImages(version.images);
+      // Handle images - they might be metadata objects from database, not File objects
+      const images = version.images || [];
+      const validImages = images.filter(img => img && (img instanceof File || (img.name || img.filename)));
+      setUploadedImages(validImages);
     }
     
     // Enable editing mode
     setIsEditing(true);
     
     toast.success('Version loaded into editor!');
+  };
+
+  const handleDeleteVersion = async (versionId) => {
+    if (!currentPrompt) return;
+    
+    if (window.confirm('Are you sure you want to delete this version? This action cannot be undone.')) {
+      try {
+        await deletePromptVersion(currentPrompt.id, versionId);
+        toast.success('Version deleted successfully!');
+      } catch (error) {
+        console.error('Error deleting version:', error);
+      }
+    }
   };
 
   return (
@@ -523,6 +559,8 @@ const PromptWorkspace = () => {
                   </select>
                 </div>
               </div>
+              
+
 
               {selectedModel && (
                 <div className="mt-4 p-4 bg-slate-700/30 rounded-xl border border-slate-600/50">
@@ -705,13 +743,30 @@ const PromptWorkspace = () => {
                         </div>
                       )}
                       <div className="grid grid-cols-2 gap-2">
-                        {uploadedImages.map((image, index) => (
+                        {uploadedImages.filter(image => image).map((image, index) => (
                           <div key={index} className="relative group">
-                            <img
-                              src={URL.createObjectURL(image)}
-                              alt={image.name}
-                              className="w-full h-20 object-cover rounded border border-slate-600/50"
-                            />
+                            {image instanceof File ? (
+                              <img
+                                src={(() => {
+                                  try {
+                                    return URL.createObjectURL(image);
+                                  } catch (error) {
+                                    console.warn('Failed to create object URL for image:', error);
+                                    return '';
+                                  }
+                                })()}
+                                alt={image.name || 'Image'}
+                                className="w-full h-20 object-cover rounded border border-slate-600/50"
+                                onError={(e) => {
+                                  console.warn('Failed to load image:', image.name);
+                                  e.target.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-20 bg-slate-700 rounded border border-slate-600/50 flex items-center justify-center">
+                                <DocumentIcon className="h-8 w-8 text-slate-400" />
+                              </div>
+                            )}
                             {isEditing && (
                               <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center">
                                 <button
@@ -723,7 +778,7 @@ const PromptWorkspace = () => {
                               </div>
                             )}
                             <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white text-xs p-1 truncate">
-                              {image.name}
+                              {image?.name || image?.filename || 'Unknown file'}
                             </div>
                           </div>
                         ))}
@@ -853,6 +908,8 @@ const PromptWorkspace = () => {
                     </pre>
                   </div>
 
+
+
                   {/* Metadata */}
                   <div className="border-t border-slate-700/50 pt-4">
                     <h4 className="text-sm font-medium text-secondary mb-2">Metadata</h4>
@@ -938,6 +995,13 @@ const PromptWorkspace = () => {
                               Copy Output
                             </button>
                           )}
+                          <button
+                            onClick={() => handleDeleteVersion(version.id)}
+                            className="text-xs text-red-400 hover:text-red-300"
+                            title="Delete version"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -948,6 +1012,8 @@ const PromptWorkspace = () => {
           </div>
         </div>
       </div>
+      
+
     </div>
   );
 };

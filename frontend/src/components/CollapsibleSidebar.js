@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   HomeIcon, 
   PencilIcon, 
-  BeakerIcon, 
   DocumentIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -15,8 +14,7 @@ import {
 const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
   { name: 'Prompt Engineering', href: '/editor', icon: PencilIcon },
-  { name: 'Experiments', href: '/experiments', icon: BeakerIcon },
-  { name: 'Model Cards', href: '/model-cards', icon: DocumentIcon },
+  { name: 'Knowledge Base', href: '/knowledge-base', icon: DocumentIcon },
 ];
 
 const CollapsibleSidebar = ({ children }) => {

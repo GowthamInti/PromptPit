@@ -27,7 +27,7 @@ export const PromptProvider = ({ children }) => {
   const fetchPrompts = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/prompts');
+      const response = await api.get('/api/prompts/with-versions');
       setPrompts(response.data);
     } catch (error) {
       console.error('Error fetching prompts:', error);
@@ -172,6 +172,19 @@ export const PromptProvider = ({ children }) => {
     }
   }, [fetchPrompts]);
 
+  const deletePromptVersion = useCallback(async (promptId, versionId) => {
+    try {
+      await api.delete(`/api/prompts/${promptId}/versions/${versionId}`);
+      await fetchPromptVersions(promptId);
+      toast.success('Version deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting prompt version:', error);
+      const errorMessage = error.response?.data?.detail || 'Failed to delete version';
+      toast.error(errorMessage);
+      throw error;
+    }
+  }, [fetchPromptVersions]);
+
   const value = {
     prompts,
     currentPrompt,
@@ -189,6 +202,7 @@ export const PromptProvider = ({ children }) => {
     runPrompt,
     deletePrompt,
     duplicatePrompt,
+    deletePromptVersion,
   };
 
   return (

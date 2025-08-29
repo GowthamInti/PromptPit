@@ -5,7 +5,11 @@ import {
   FolderIcon,
   DocumentDuplicateIcon,
   TrashIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  LockClosedIcon
 } from '@heroicons/react/24/outline';
 import { usePrompts } from '../contexts/PromptContext';
 import toast from 'react-hot-toast';
@@ -16,12 +20,14 @@ const PromptEngineering = () => {
     loading, 
     fetchPrompts,
     deletePrompt,
-    duplicatePrompt
+    duplicatePrompt,
+    deletePromptVersion
   } = usePrompts();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterProvider, setFilterProvider] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
+  const [expandedPrompts, setExpandedPrompts] = useState(new Set());
 
   useEffect(() => {
     fetchPrompts();
@@ -44,6 +50,29 @@ const PromptEngineering = () => {
       toast.success('Prompt duplicated successfully!');
     } catch (error) {
       console.error('Error duplicating prompt:', error);
+    }
+  };
+
+  const togglePromptExpansion = (promptId) => {
+    const newExpanded = new Set(expandedPrompts);
+    if (newExpanded.has(promptId)) {
+      newExpanded.delete(promptId);
+    } else {
+      newExpanded.add(promptId);
+    }
+    setExpandedPrompts(newExpanded);
+  };
+
+  const handleDeleteVersion = async (promptId, versionId) => {
+    if (window.confirm('Are you sure you want to delete this version? This action cannot be undone.')) {
+      try {
+        await deletePromptVersion(promptId, versionId);
+        toast.success('Version deleted successfully!');
+        // Refresh the prompts to update the version count
+        await fetchPrompts();
+      } catch (error) {
+        console.error('Error deleting version:', error);
+      }
     }
   };
 
@@ -192,61 +221,146 @@ const PromptEngineering = () => {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-4">
             {sortedPrompts.map((prompt) => (
-              <div key={prompt.id} className="bg-slate-800 rounded-lg p-6 border border-slate-700 hover:border-slate-600 transition-all duration-200 group">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-white truncate group-hover:text-blue-400 transition-colors">
-                      {prompt.title || 'Untitled Prompt'}
-                    </h3>
-                    <p className="text-sm text-slate-400 mt-1">
-                      {prompt.provider_name} • {prompt.model_name}
+              <div key={prompt.id} className="bg-slate-800 rounded-lg border border-slate-700 hover:border-slate-600 transition-all duration-200">
+                {/* Main Prompt Card */}
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => togglePromptExpansion(prompt.id)}
+                          className="text-slate-400 hover:text-blue-400 transition-colors"
+                        >
+                          {expandedPrompts.has(prompt.id) ? (
+                            <ChevronDownIcon className="h-4 w-4" />
+                          ) : (
+                            <ChevronRightIcon className="h-4 w-4" />
+                          )}
+                        </button>
+                        <h3 className="text-lg font-semibold text-white">
+                          {prompt.title || 'Untitled Prompt'}
+                        </h3>
+                        {prompt.versions_count > 0 && (
+                          <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
+                            {prompt.versions_count} version{prompt.versions_count !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-400 mt-1">
+                        {prompt.provider_name} • {prompt.model_name}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <p className="text-sm text-slate-300 line-clamp-3">
+                      {prompt.text?.substring(0, 120)}
+                      {prompt.text?.length > 120 && '...'}
                     </p>
                   </div>
-                </div>
-                
-                <div className="mb-4">
-                  <p className="text-sm text-slate-300 line-clamp-3">
-                    {prompt.text?.substring(0, 120)}
-                    {prompt.text?.length > 120 && '...'}
-                  </p>
-                </div>
-                
-                <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
-                  <span>
-                    Created {new Date(prompt.created_at).toLocaleDateString()}
-                  </span>
-                  {prompt.last_output && (
-                    <span className="text-emerald-400">✓ Has output</span>
-                  )}
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <Link
-                    to={`/editor/${prompt.id}`}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex-1 text-center text-sm"
-                  >
-                    Open Prompt
-                  </Link>
                   
-                  <div className="flex items-center space-x-1 ml-2">
-                    <button
-                      onClick={() => handleDuplicatePrompt(prompt.id)}
-                      className="p-2 text-slate-400 hover:text-blue-400 transition-colors"
-                      title="Duplicate prompt"
+                  <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
+                    <span>
+                      Created {new Date(prompt.created_at).toLocaleDateString()}
+                    </span>
+                    {prompt.last_output && (
+                      <span className="text-emerald-400">✓ Has output</span>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Link
+                      to={`/editor/${prompt.id}`}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex-1 text-center text-sm"
                     >
-                      <DocumentDuplicateIcon className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeletePrompt(prompt.id, prompt.title)}
-                      className="p-2 text-slate-400 hover:text-red-400 transition-colors"
-                      title="Delete prompt"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
+                      Open Prompt
+                    </Link>
+                    
+                    <div className="flex items-center space-x-1 ml-2">
+                      <button
+                        onClick={() => handleDuplicatePrompt(prompt.id)}
+                        className="p-2 text-slate-400 hover:text-blue-400 transition-colors"
+                        title="Duplicate prompt"
+                      >
+                        <DocumentDuplicateIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeletePrompt(prompt.id, prompt.title)}
+                        className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+                        title="Delete prompt"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
+
+                {/* Versions Section */}
+                {expandedPrompts.has(prompt.id) && prompt.versions && prompt.versions.length > 0 && (
+                  <div className="border-t border-slate-700 bg-slate-750">
+                    <div className="p-4">
+                      <h4 className="text-sm font-medium text-slate-300 mb-3">Locked Versions</h4>
+                      <div className="space-y-3">
+                        {prompt.versions.map((version) => (
+                          <div key={version.id} className="bg-slate-700 rounded-lg p-4 border border-slate-600">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                <LockClosedIcon className="h-4 w-4 text-blue-400" />
+                                <span className="text-sm font-medium text-white">
+                                  Version {version.version_number}
+                                </span>
+                                <span className="text-xs text-slate-400">
+                                  {new Date(version.created_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <span className="text-xs text-slate-400">
+                                by {version.locked_by_user}
+                              </span>
+                            </div>
+                            
+                            <div className="mb-3">
+                              <p className="text-sm text-slate-300 line-clamp-2">
+                                {version.prompt_text?.substring(0, 100)}
+                                {version.prompt_text?.length > 100 && '...'}
+                              </p>
+                            </div>
+                            
+                            <div className="flex items-center justify-between text-xs text-slate-500">
+                              <div className="flex items-center space-x-4">
+                                <span>Temp: {version.temperature}</span>
+                                <span>Tokens: {version.max_tokens}</span>
+                                {version.files && version.files.length > 0 && (
+                                  <span className="text-blue-400">
+                                    📎 {version.files.length} file{version.files.length !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                                {version.images && version.images.length > 0 && (
+                                  <span className="text-green-400">
+                                    🖼️ {version.images.length} image{version.images.length !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </div>
+                              {version.output && (
+                                <span className="text-emerald-400">✓ Has output</span>
+                              )}
+                            </div>
+                            <div className="mt-2 flex justify-end">
+                              <button
+                                onClick={() => handleDeleteVersion(prompt.id, version.id)}
+                                className="text-xs text-red-400 hover:text-red-300"
+                                title="Delete version"
+                              >
+                                Delete Version
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

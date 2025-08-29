@@ -14,11 +14,18 @@ import {
   EyeIcon,
   PencilIcon,
   PlusIcon,
-  Cog6ToothIcon
+  Cog6ToothIcon,
+  BookOpenIcon,
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import { useProviders } from '../contexts/ProviderContext';
 import { usePrompts } from '../contexts/PromptContext';
+import api from '../services/api';
 import toast from 'react-hot-toast';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import 'highlight.js/styles/github-dark.css';
 
 const PromptEditor = () => {
   const { promptId } = useParams();
@@ -38,7 +45,8 @@ const PromptEditor = () => {
     createAndLockPrompt,
     runPrompt,
     duplicatePrompt,
-    deletePrompt
+    deletePrompt,
+    deletePromptVersion
   } = usePrompts();
 
   // Generate unique temporary ID for new prompts
@@ -63,10 +71,53 @@ const PromptEditor = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isNewPrompt, setIsNewPrompt] = useState(false);
   const [showModelConfig, setShowModelConfig] = useState(false);
+  
+  // Knowledge Base RAG states
+  const [knowledgeBases, setKnowledgeBases] = useState([]);
+  const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState(null);
+  const [ragContext, setRagContext] = useState(null);
+  const [showRagPreview, setShowRagPreview] = useState(false);
+  const [loadingRagPreview, setLoadingRagPreview] = useState(false);
+
+  // Drag and drop states
+  const [isDraggingDoc, setIsDraggingDoc] = useState(false);
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
+  const [justDroppedDoc, setJustDroppedDoc] = useState(false);
+  const [justDroppedImage, setJustDroppedImage] = useState(false);
+
+  // Markdown rendering states
+  const [renderAsMarkdown, setRenderAsMarkdown] = useState(true);
 
   // Refs for file inputs
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
+  
+  // Fetch knowledge bases on component mount
+  useEffect(() => {
+    const fetchKnowledgeBases = async () => {
+      try {
+        console.log('Fetching knowledge bases...');
+        const response = await api.get('/api/knowledge-bases');
+        console.log('Knowledge bases response:', response.data);
+        
+        // The API returns { knowledge_bases: [...], total_count: 0, page: 1, page_size: 10 }
+        const kbData = response.data;
+        if (kbData && Array.isArray(kbData.knowledge_bases)) {
+          setKnowledgeBases(kbData.knowledge_bases);
+        } else if (Array.isArray(kbData)) {
+          // Fallback if API returns direct array
+          setKnowledgeBases(kbData);
+        } else {
+          console.warn('Knowledge bases response format unexpected:', kbData);
+          setKnowledgeBases([]);
+        }
+      } catch (error) {
+        console.error('Error fetching knowledge bases:', error);
+        setKnowledgeBases([]); // Set empty array on error
+      }
+    };
+    fetchKnowledgeBases();
+  }, []);
 
   // Determine if this is a new prompt or editing existing
   useEffect(() => {
@@ -98,9 +149,21 @@ const PromptEditor = () => {
         max_tokens: currentPrompt.max_tokens || 1000,
       });
       setUploadedFiles(currentPrompt.files || []);
-      setUploadedImages(currentPrompt.images || []);
+      // Handle images - they might be metadata objects from database, not File objects
+      const images = currentPrompt.images || [];
+      const validImages = images.filter(img => img && (img instanceof File || (img.name || img.filename)));
+      setUploadedImages(validImages);
       setOutput(currentPrompt.last_output || null);
       setIsEditing(false);
+      
+      // Load versions for this prompt
+      if (currentPrompt.id) {
+        fetchPromptVersions(currentPrompt.id);
+        // Show versions panel if the prompt has versions
+        if (currentPrompt.versions_count > 0) {
+          setShowVersions(true);
+        }
+      }
     } else if (isNewPrompt) {
       setPromptData({
         id: generateTempId(),
@@ -143,6 +206,17 @@ const PromptEditor = () => {
 
   const handleFileUpload = (event) => {
     const files = Array.from(event.target.files);
+    handleDocumentDrop(files);
+    event.target.value = '';
+  };
+
+  const handleImageUpload = (event) => {
+    const files = Array.from(event.target.files);
+    handleImageDrop(files);
+    event.target.value = '';
+  };
+
+  const handleDocumentDrop = (files) => {
     const supportedExtensions = ['.pdf', '.docx', '.pptx'];
     
     const validFiles = files.filter(file => {
@@ -157,13 +231,14 @@ const PromptEditor = () => {
     if (validFiles.length > 0) {
       setUploadedFiles(prev => [...prev, ...validFiles]);
       toast.success(`${validFiles.length} document(s) uploaded successfully!`);
+      
+      // Show success animation
+      setJustDroppedDoc(true);
+      setTimeout(() => setJustDroppedDoc(false), 1000);
     }
-    
-    event.target.value = '';
   };
 
-  const handleImageUpload = (event) => {
-    const files = Array.from(event.target.files);
+  const handleImageDrop = (files) => {
     const supportedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp'];
     
     const validFiles = files.filter(file => {
@@ -178,9 +253,69 @@ const PromptEditor = () => {
     if (validFiles.length > 0) {
       setUploadedImages(prev => [...prev, ...validFiles]);
       toast.success(`${validFiles.length} image(s) uploaded successfully!`);
+      
+      // Show success animation
+      setJustDroppedImage(true);
+      setTimeout(() => setJustDroppedImage(false), 1000);
     }
+  };
+
+  const handleDocumentDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDocumentDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingDoc(true);
+  };
+
+  const handleDocumentDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set to false if we're actually leaving the drop zone
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsDraggingDoc(false);
+    }
+  };
+
+  const handleDocumentDropEvent = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingDoc(false);
     
-    event.target.value = '';
+    const files = Array.from(e.dataTransfer.files);
+    handleDocumentDrop(files);
+  };
+
+  const handleImageDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleImageDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingImage(true);
+  };
+
+  const handleImageDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set to false if we're actually leaving the drop zone
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsDraggingImage(false);
+    }
+  };
+
+  const handleImageDropEvent = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingImage(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    handleImageDrop(files);
   };
 
   const removeFile = (index) => {
@@ -222,6 +357,34 @@ const PromptEditor = () => {
     }
   };
 
+  const handleRagPreview = async () => {
+    if (!selectedKnowledgeBase || !promptData.text.trim()) {
+      toast.error('Please select a knowledge base and enter a prompt');
+      return;
+    }
+
+    try {
+      setLoadingRagPreview(true);
+      const formData = new FormData();
+      formData.append('knowledge_base_id', selectedKnowledgeBase.id);
+      formData.append('query', promptData.text);
+
+      const response = await api.post('/api/rag-preview', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      setRagContext(response.data);
+      setShowRagPreview(true);
+    } catch (error) {
+      console.error('Error getting RAG preview:', error);
+      toast.error('Failed to get RAG context preview');
+    } finally {
+      setLoadingRagPreview(false);
+    }
+  };
+
   const handleRunPrompt = async () => {
     if (!selectedProvider || !selectedModel) {
       toast.error('Please select a provider and model');
@@ -245,6 +408,11 @@ const PromptEditor = () => {
         include_file_content: includeFileContent,
         file_content_prefix: fileContentPrefix,
       };
+
+      // Add knowledge base for RAG if selected
+      if (selectedKnowledgeBase) {
+        requestData.knowledge_base_id = selectedKnowledgeBase.id;
+      }
 
       if (uploadedFiles.length > 0 && includeFileContent) {
         requestData.files = uploadedFiles;
@@ -332,6 +500,28 @@ const PromptEditor = () => {
     toast.success('Copied to clipboard!');
   };
 
+  // Function to detect if content looks like markdown
+  const isMarkdownContent = (text) => {
+    if (!text) return false;
+    
+    const markdownPatterns = [
+      /^#{1,6}\s/m,           // Headers (# ## ###)
+      /\*\*.*\*\*/,           // Bold text
+      /\*.*\*/,               // Italic text  
+      /```[\s\S]*?```/,       // Code blocks
+      /`[^`]+`/,              // Inline code
+      /^\s*[-*+]\s/m,         // Unordered lists
+      /^\s*\d+\.\s/m,         // Ordered lists
+      /\[.*\]\(.*\)/,         // Links
+      /!\[.*\]\(.*\)/,        // Images
+      /^\s*>/m,               // Blockquotes
+      /\|.*\|/,               // Tables
+      /^---+$/m,              // Horizontal rules
+    ];
+    
+    return markdownPatterns.some(pattern => pattern.test(text));
+  };
+
   const loadVersion = (version) => {
     // Populate the prompt editor with the selected version data
     setPromptData({
@@ -352,13 +542,29 @@ const PromptEditor = () => {
       setUploadedFiles(version.files);
     }
     if (version.images) {
-      setUploadedImages(version.images);
+      // Handle images - they might be metadata objects from database, not File objects
+      const images = version.images || [];
+      const validImages = images.filter(img => img && (img instanceof File || (img.name || img.filename)));
+      setUploadedImages(validImages);
     }
     
     // Enable editing mode
     setIsEditing(true);
     
     toast.success('Version loaded into editor!');
+  };
+
+  const handleDeleteVersion = async (versionId) => {
+    if (!currentPrompt) return;
+    
+    if (window.confirm('Are you sure you want to delete this version? This action cannot be undone.')) {
+      try {
+        await deletePromptVersion(currentPrompt.id, versionId);
+        toast.success('Version deleted successfully!');
+      } catch (error) {
+        console.error('Error deleting version:', error);
+      }
+    }
   };
 
   return (
@@ -503,6 +709,63 @@ const PromptEditor = () => {
         </div>
       )}
 
+      {/* Knowledge Base RAG Section - Always Visible */}
+      <div className="bg-slate-800 text-white px-6 py-4 border-b border-slate-700">
+        <div className="max-w-4xl mx-auto">
+          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-blue-300 mb-2">
+                  <BookOpenIcon className="h-4 w-4 inline mr-1" />
+                  🧠 Knowledge Base (RAG) - Optional {Array.isArray(knowledgeBases) && knowledgeBases.length > 0 && `(${knowledgeBases.length} available)`}
+                </label>
+                <div className="flex space-x-3">
+                  <select
+                    value={selectedKnowledgeBase?.id || ''}
+                    onChange={(e) => {
+                      if (Array.isArray(knowledgeBases)) {
+                        const kb = knowledgeBases.find(k => k.id === parseInt(e.target.value));
+                        setSelectedKnowledgeBase(kb || null);
+                      } else {
+                        setSelectedKnowledgeBase(null);
+                      }
+                    }}
+                    className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">No Knowledge Base</option>
+                    {Array.isArray(knowledgeBases) && knowledgeBases.map((kb) => (
+                      <option key={kb.id} value={kb.id}>
+                        {kb.name} ({kb.content_count || 0} docs)
+                      </option>
+                    ))}
+                  </select>
+                  {selectedKnowledgeBase && promptData.text.trim() && (
+                    <button
+                      onClick={handleRagPreview}
+                      disabled={loadingRagPreview}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 disabled:opacity-50 transition-colors"
+                    >
+                      {loadingRagPreview ? (
+                        <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <MagnifyingGlassIcon className="h-4 w-4" />
+                      )}
+                      <span>Preview Context</span>
+                    </button>
+                  )}
+                </div>
+                {selectedKnowledgeBase && (
+                  <div className="mt-2 text-xs text-blue-300">
+                    ✓ Selected: <span className="font-medium">{selectedKnowledgeBase.name}</span> • {selectedKnowledgeBase.content_count || 0} documents
+                    <span className="ml-2 text-slate-400">Your prompt will be enhanced with relevant context from this knowledge base.</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Main Content */}
       <div className="flex-1 flex">
         {/* Messages Section */}
@@ -579,43 +842,104 @@ Tone:
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
               <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium">User *</span>
-              {isEditing && (
-                <div className="flex items-center space-x-2">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    accept=".pdf,.docx,.pptx"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                  <input
-                    ref={imageInputRef}
-                    type="file"
-                    multiple
-                    accept=".png,.jpg,.jpeg,.gif,.bmp"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-1 bg-slate-700 text-slate-300 rounded text-xs hover:bg-slate-600 transition-colors flex items-center"
-                  >
-                    <PaperClipIcon className="h-3 w-3 mr-1" />
-                    Add Docs
-                  </button>
-                  <button
-                    onClick={() => imageInputRef.current?.click()}
-                    className="px-3 py-1 bg-slate-700 text-slate-300 rounded text-xs hover:bg-slate-600 transition-colors flex items-center"
-                  >
-                    <svg className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    Add Images
-                  </button>
-                </div>
-              )}
             </div>
+
+            {/* Hidden file inputs for fallback */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.docx,.pptx"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <input
+              ref={imageInputRef}
+              type="file"
+              multiple
+              accept=".png,.jpg,.jpeg,.gif,.bmp"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+
+            {/* Drag and Drop Zones */}
+            {isEditing && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                {/* Document Drop Zone */}
+                <div
+                  onDragOver={handleDocumentDragOver}
+                  onDragEnter={handleDocumentDragEnter}
+                  onDragLeave={handleDocumentDragLeave}
+                  onDrop={handleDocumentDropEvent}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer group ${
+                    isDraggingDoc
+                      ? 'border-blue-400 bg-blue-500/10 scale-105'
+                      : justDroppedDoc
+                      ? 'border-green-400 bg-green-500/10'
+                      : 'border-slate-600 hover:border-blue-500 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <DocumentIcon className={`h-8 w-8 mx-auto mb-2 transition-colors ${
+                    isDraggingDoc 
+                      ? 'text-blue-400' 
+                      : justDroppedDoc
+                      ? 'text-green-400'
+                      : 'text-slate-400 group-hover:text-blue-400'
+                  }`} />
+                  <p className={`text-sm font-medium transition-colors ${
+                    isDraggingDoc 
+                      ? 'text-blue-300' 
+                      : justDroppedDoc
+                      ? 'text-green-300'
+                      : 'text-slate-300 group-hover:text-blue-300'
+                  }`}>
+                    {isDraggingDoc ? 'Release to upload documents' : justDroppedDoc ? 'Documents uploaded!' : 'Drop documents here'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    PDF, DOCX, PPTX • or click to browse
+                  </p>
+                </div>
+
+                {/* Image Drop Zone */}
+                <div
+                  onDragOver={handleImageDragOver}
+                  onDragEnter={handleImageDragEnter}
+                  onDragLeave={handleImageDragLeave}
+                  onDrop={handleImageDropEvent}
+                  onClick={() => imageInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer group ${
+                    isDraggingImage
+                      ? 'border-green-400 bg-green-500/10 scale-105'
+                      : justDroppedImage
+                      ? 'border-green-400 bg-green-500/10'
+                      : 'border-slate-600 hover:border-green-500 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <svg className={`h-8 w-8 mx-auto mb-2 transition-colors ${
+                    isDraggingImage 
+                      ? 'text-green-400' 
+                      : justDroppedImage
+                      ? 'text-green-400'
+                      : 'text-slate-400 group-hover:text-green-400'
+                  }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className={`text-sm font-medium transition-colors ${
+                    isDraggingImage 
+                      ? 'text-green-300' 
+                      : justDroppedImage
+                      ? 'text-green-300'
+                      : 'text-slate-300 group-hover:text-green-300'
+                  }`}>
+                    {isDraggingImage ? 'Release to upload images' : justDroppedImage ? 'Images uploaded!' : 'Drop images here'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    PNG, JPG, GIF, BMP • or click to browse
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Uploaded Files */}
             {uploadedFiles.length > 0 && (
@@ -660,13 +984,30 @@ Tone:
               <div className="mb-4 p-3 bg-slate-800 rounded-lg border border-slate-700">
                 <span className="text-xs text-slate-400 mb-2 block">Attached images ({uploadedImages.length})</span>
                 <div className="grid grid-cols-2 gap-2">
-                  {uploadedImages.map((image, index) => (
+                  {uploadedImages.filter(image => image).map((image, index) => (
                     <div key={index} className="relative">
-                      <img
-                        src={URL.createObjectURL(image)}
-                        alt={image.name}
-                        className="w-full h-16 object-cover rounded"
-                      />
+                      {image instanceof File ? (
+                        <img
+                          src={(() => {
+                            try {
+                              return URL.createObjectURL(image);
+                            } catch (error) {
+                              console.warn('Failed to create object URL for image:', error);
+                              return '';
+                            }
+                          })()}
+                          alt={image.name || 'Image'}
+                          className="w-full h-16 object-cover rounded"
+                          onError={(e) => {
+                            console.warn('Failed to load image:', image.name);
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-16 bg-slate-700 rounded flex items-center justify-center">
+                          <DocumentIcon className="h-6 w-6 text-slate-400" />
+                        </div>
+                      )}
                       {isEditing && (
                         <button
                           onClick={() => removeImage(index)}
@@ -705,7 +1046,7 @@ Tone:
                 </>
               ) : (
                 <>
-                  <PlusIcon className="h-4 w-4" />
+                  <PlayIcon className="h-4 w-4" />
                   <span>Run Prompt</span>
                 </>
               )}
@@ -722,9 +1063,41 @@ Tone:
               </div>
             ) : (
               <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+                {/* RAG Context Display */}
+                {output.rag_context && (
+                  <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-blue-300 flex items-center">
+                        <BookOpenIcon className="h-4 w-4 mr-1" />
+                        RAG Context Used
+                      </span>
+                      <span className="text-xs text-blue-400">
+                        {output.rag_context.results?.length || 0} relevant docs found
+                      </span>
+                    </div>
+                    <details className="mt-2">
+                      <summary className="text-xs text-blue-300 cursor-pointer hover:text-blue-200">
+                        View retrieved context →
+                      </summary>
+                      <div className="mt-2 p-2 bg-slate-900/50 rounded text-xs text-slate-300 max-h-32 overflow-y-auto">
+                        <pre className="whitespace-pre-wrap">{output.rag_context.enhanced_prompt || 'No context available'}</pre>
+                      </div>
+                    </details>
+                  </div>
+                )}
+                
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-white">Response</span>
                   <div className="flex items-center space-x-2">
+                    {/* Markdown/Plain Text Toggle */}
+                    {output.output_text && isMarkdownContent(output.output_text) && (
+                      <button
+                        onClick={() => setRenderAsMarkdown(!renderAsMarkdown)}
+                        className="text-slate-400 hover:text-slate-300 text-xs px-2 py-1 rounded border border-slate-600 hover:border-slate-500"
+                      >
+                        {renderAsMarkdown ? '📝 Plain' : '🎨 Markdown'}
+                      </button>
+                    )}
                     <button
                       onClick={() => copyToClipboard(output.output_text)}
                       className="text-blue-400 hover:text-blue-300 text-sm"
@@ -742,9 +1115,48 @@ Tone:
                     )}
                   </div>
                 </div>
-                <pre className="whitespace-pre-wrap text-sm text-slate-200 font-mono">
-                  {output.output_text}
-                </pre>
+                
+                {/* Conditional Rendering: Markdown or Plain Text */}
+                {output.output_text && isMarkdownContent(output.output_text) && renderAsMarkdown ? (
+                  <div className="prose prose-invert prose-sm max-w-none">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeHighlight]}
+                      components={{
+                        // Custom styling for markdown elements
+                        h1: ({node, ...props}) => <h1 className="text-2xl font-bold text-white mb-4 mt-6 border-b border-slate-600 pb-2" {...props} />,
+                        h2: ({node, ...props}) => <h2 className="text-xl font-semibold text-white mb-3 mt-5" {...props} />,
+                        h3: ({node, ...props}) => <h3 className="text-lg font-medium text-white mb-2 mt-4" {...props} />,
+                        h4: ({node, ...props}) => <h4 className="text-base font-medium text-white mb-2 mt-3" {...props} />,
+                        h5: ({node, ...props}) => <h5 className="text-sm font-medium text-white mb-1 mt-2" {...props} />,
+                        h6: ({node, ...props}) => <h6 className="text-sm font-medium text-slate-300 mb-1 mt-2" {...props} />,
+                        p: ({node, ...props}) => <p className="text-slate-200 mb-3 leading-relaxed" {...props} />,
+                        strong: ({node, ...props}) => <strong className="text-white font-semibold" {...props} />,
+                        em: ({node, ...props}) => <em className="text-slate-300 italic" {...props} />,
+                        ul: ({node, ...props}) => <ul className="text-slate-200 mb-3 ml-4 space-y-1" {...props} />,
+                        ol: ({node, ...props}) => <ol className="text-slate-200 mb-3 ml-4 space-y-1" {...props} />,
+                        li: ({node, ...props}) => <li className="text-slate-200" {...props} />,
+                        blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-blue-500 pl-4 py-2 my-4 bg-slate-800/50 text-slate-300 italic" {...props} />,
+                        code: ({node, inline, ...props}) => 
+                          inline 
+                            ? <code className="bg-slate-700 text-blue-300 px-1.5 py-0.5 rounded text-sm font-mono" {...props} />
+                            : <code className="block bg-slate-900 text-slate-200 p-3 rounded-lg text-sm font-mono overflow-x-auto" {...props} />,
+                        pre: ({node, ...props}) => <pre className="bg-slate-900 text-slate-200 p-4 rounded-lg text-sm font-mono overflow-x-auto mb-4" {...props} />,
+                        a: ({node, ...props}) => <a className="text-blue-400 hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer" {...props} />,
+                        table: ({node, ...props}) => <table className="w-full border-collapse border border-slate-600 mb-4" {...props} />,
+                        th: ({node, ...props}) => <th className="border border-slate-600 px-3 py-2 bg-slate-800 text-white font-semibold text-left" {...props} />,
+                        td: ({node, ...props}) => <td className="border border-slate-600 px-3 py-2 text-slate-200" {...props} />,
+                        hr: ({node, ...props}) => <hr className="border-slate-600 my-6" {...props} />,
+                      }}
+                    >
+                      {output.output_text}
+                    </ReactMarkdown>
+                  </div>
+                ) : (
+                  <pre className="whitespace-pre-wrap text-sm text-slate-200 font-mono">
+                    {output.output_text}
+                  </pre>
+                )}
               </div>
             )}
           </div>
@@ -807,6 +1219,13 @@ Tone:
                           Copy Output
                         </button>
                       )}
+                      <button
+                        onClick={() => handleDeleteVersion(version.id)}
+                        className="text-xs text-red-400 hover:text-red-300"
+                        title="Delete version"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -815,6 +1234,100 @@ Tone:
           </div>
         )}
       </div>
+      
+      {/* RAG Context Preview Modal */}
+      {showRagPreview && ragContext && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 rounded-lg border border-slate-800 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-slate-800">
+              <div className="flex items-center space-x-3">
+                <BookOpenIcon className="h-6 w-6 text-blue-400" />
+                <div>
+                  <h3 className="text-lg font-semibold text-white">
+                    RAG Context Preview
+                  </h3>
+                  <p className="text-sm text-slate-400">
+                    Knowledge Base: {selectedKnowledgeBase?.name} • {ragContext.results?.length || 0} relevant documents found
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowRagPreview(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Enhanced Prompt Preview */}
+              <div className="mb-6">
+                <h4 className="text-sm font-medium text-blue-300 mb-3 flex items-center">
+                  <MagnifyingGlassIcon className="h-4 w-4 mr-1" />
+                  Enhanced Prompt (with context)
+                </h4>
+                <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 max-h-64 overflow-y-auto">
+                  <pre className="whitespace-pre-wrap text-sm text-slate-200 font-mono">
+                    {ragContext.enhanced_prompt || 'No enhanced prompt available'}
+                  </pre>
+                </div>
+              </div>
+              
+              {/* Search Results */}
+              {ragContext.results && ragContext.results.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-slate-300 mb-3">
+                    Retrieved Documents ({ragContext.results.length})
+                  </h4>
+                  <div className="space-y-3">
+                    {ragContext.results.map((result, index) => (
+                      <div key={index} className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded">
+                              #{index + 1}
+                            </span>
+                            <span className="text-sm font-medium text-white">
+                              {result.filename || 'Unknown file'}
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-400">
+                            Similarity: {(result.distance * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="text-sm text-slate-300 max-h-32 overflow-y-auto">
+                          <p className="whitespace-pre-wrap">
+                            {result.content || result.text || 'No content available'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="border-t border-slate-800 p-6 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowRagPreview(false)}
+                className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowRagPreview(false);
+                  handleRunPrompt();
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
+              >
+                <PlayIcon className="h-4 w-4" />
+                <span>Run with Context</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
