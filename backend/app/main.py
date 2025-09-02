@@ -7,7 +7,7 @@ import os
 
 from app.database.connection import get_db, engine
 from app.database import models
-from app.api import providers, prompts, knowledge_bases
+from app.api import providers, prompts, knowledge_bases, chat
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
@@ -78,6 +78,7 @@ app.add_middleware(
 app.include_router(providers.router, prefix="/api", tags=["providers"])
 app.include_router(prompts.router, prefix="/api", tags=["prompts"])
 app.include_router(knowledge_bases.router, prefix="/api", tags=["knowledge-bases"])
+app.include_router(chat.router, prefix="/api", tags=["chat"])
 
 # Health check with detailed info
 @app.get("/api/health", tags=["health"])
