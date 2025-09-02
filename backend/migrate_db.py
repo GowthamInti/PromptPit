@@ -342,6 +342,69 @@ def migrate_vision_support():
         print(f"❌ Vision support migration failed: {e}")
         return False
 
+def migrate_structured_output():
+    """Migrate database to add structured output support to prompt versions."""
+    try:
+        engine = create_engine(DATABASE_URL)
+        
+        with engine.connect() as conn:
+            print("🔄 Starting structured output migration...")
+            
+            # Detect database type
+            db_type = "postgresql" if "postgresql" in DATABASE_URL else "sqlite"
+            print(f"🔍 Detected database type: {db_type}")
+            
+            # Check if structured_output column exists in prompt_versions table
+            if db_type == "sqlite":
+                result = conn.execute(text("PRAGMA table_info(prompt_versions)"))
+                columns = [column[1] for column in result.fetchall()]
+            else:  # postgresql
+                result = conn.execute(text("""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name = 'prompt_versions' AND table_schema = 'public'
+                """))
+                columns = [column[0] for column in result.fetchall()]
+            
+            # Add structured_output column if it doesn't exist
+            if 'structured_output' not in columns:
+                print("📝 Adding structured_output column to prompt_versions table...")
+                conn.execute(text("ALTER TABLE prompt_versions ADD COLUMN structured_output BOOLEAN DEFAULT FALSE"))
+                print("✅ structured_output column added successfully.")
+            else:
+                print("ℹ️  structured_output column already exists.")
+            
+            # Add json_schema column if it doesn't exist
+            if 'json_schema' not in columns:
+                print("📝 Adding json_schema column to prompt_versions table...")
+                if db_type == "sqlite":
+                    conn.execute(text("ALTER TABLE prompt_versions ADD COLUMN json_schema TEXT"))
+                else:  # postgresql
+                    conn.execute(text("ALTER TABLE prompt_versions ADD COLUMN json_schema TEXT"))
+                print("✅ json_schema column added successfully.")
+            else:
+                print("ℹ️  json_schema column already exists.")
+            
+            # Add comments for PostgreSQL
+            if db_type == "postgresql":
+                try:
+                    conn.execute(text("""
+                        COMMENT ON COLUMN prompt_versions.structured_output IS 'Whether structured output was enabled for this version'
+                    """))
+                    conn.execute(text("""
+                        COMMENT ON COLUMN prompt_versions.json_schema IS 'JSON schema used for structured output formatting'
+                    """))
+                    print("✅ Column comments added successfully.")
+                except Exception as e:
+                    print(f"⚠️  Warning: Could not add column comments: {e}")
+            
+            conn.commit()
+            print("✅ Structured output migration completed successfully!")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Structured output migration failed: {e}")
+        return False
+
 # def add_sample_data():
 #     """Add sample data for testing."""
 #     try:
@@ -579,6 +642,10 @@ def main():
     
     # Run vision support migration
     if not migrate_vision_support():
+        sys.exit(1)
+    
+    # Run structured output migration
+    if not migrate_structured_output():
         sys.exit(1)
     
     # Run prompt title constraints migration

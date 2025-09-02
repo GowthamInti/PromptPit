@@ -86,12 +86,19 @@ class ProviderService:
             try:
                 extracted_contents = await self.file_extraction_service.extract_text_from_files(prompt_data["files"])
                 file_content = "\n\n".join([content for content in extracted_contents 
-                                          if not content.startswith("Error processing") 
-                                          and not content.startswith("Unsupported file type")])
+                                        if not content.startswith("Error processing") 
+                                        and not content.startswith("Unsupported file type")])
                 
                 if file_content:
-                    prompt_data["file_content"] = file_content
-                    prompt_data["file_content_prefix"] = prompt_data.get("file_content_prefix", "File content:\n")
+                    # Integrate file content directly into the text with prefix
+                    file_content_prefix = prompt_data.get("file_content_prefix", "Content extracted from documents:\n")
+                    original_text = prompt_data["text"]
+                    prompt_data["text"] = f"{file_content_prefix}{file_content}\n\nUser prompt: {original_text}"
+                    
+                    # Remove the separate file_content key since it's now integrated
+                    prompt_data.pop("file_content", None)
+                    prompt_data.pop("file_content_prefix", None)
+                    
             except Exception as e:
                 # Log error but continue without file content
                 print(f"Error extracting file content: {str(e)}")
@@ -102,6 +109,48 @@ class ProviderService:
             model = self.db.query(Model).filter(Model.id == prompt_data.get("model_id")).first()
             if model and not model.supports_vision:
                 raise ValueError(f"Model '{model.name}' does not support vision. Please select a vision-capable model like GPT-4 Vision or Llama 4 Scout.")
+        
+        # Handle structured output if enabled
+        if prompt_data.get("structured_output") and prompt_data.get("json_schema"):
+            try:
+                # Parse the JSON schema to validate it
+                import json
+                schema = json.loads(prompt_data["json_schema"])
+                
+                # Basic schema validation
+                if not isinstance(schema, dict):
+                    raise ValueError("Schema must be a JSON object")
+                
+                # Check if the model supports structured output
+                model = self.db.query(Model).filter(Model.id == prompt_data.get("model_id")).first()
+                if model:
+                    # For now, assume all models support structured output
+                    # In the future, we could add a supports_structured_output field to the Model table
+                    print(f"Using structured output with model: {model.name}")
+                
+                # Add structured output configuration to prompt_data for provider services
+                prompt_data["response_format"] = {
+                                                "type": "json_schema",
+                                                "json_schema": {
+                                                    "name": "Report",
+                                                    "schema": schema
+                                                }
+                                            }
+
+                
+                # Also add a note to the prompt text to inform the user
+                structured_note = "\n\nPlease provide your response in the exact JSON format specified by the schema."
+                prompt_data["text"] = prompt_data["text"] + structured_note
+                
+                print(f"Structured output enabled with schema: {json.dumps(schema, indent=2)}")
+                
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Warning: Invalid JSON schema provided for structured output: {prompt_data['json_schema']}")
+                print(f"Error: {str(e)}")
+                # Continue without structured output if schema is invalid
+                prompt_data["structured_output"] = False
+                prompt_data.pop("response_format", None)
+        
         if provider.name == "openai":
             return await self.openai_service.run_prompt(prompt_data)
         elif provider.name == "groq":

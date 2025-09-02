@@ -1,6 +1,6 @@
 # backend/app/schemas/provider_schemas.py
 from pydantic import BaseModel, validator
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 class ProviderCreate(BaseModel):
@@ -44,33 +44,14 @@ class ModelResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
-# backend/app/schemas/prompt_schemas.py
-from pydantic import BaseModel, validator
-from typing import Optional, Dict, Any, List
-from datetime import datetime
-
+# Prompt schemas
 class PromptCreate(BaseModel):
     provider_id: int
     model_id: int
     title: Optional[str] = "Untitled Prompt"
     text: str
     system_prompt: Optional[str] = None
-    temperature: Optional[float] = 0.7
-    max_tokens: Optional[int] = 1000
     user_id: Optional[str] = "default_user"
-    
-    @validator('temperature')
-    def validate_temperature(cls, v):
-        if v is not None and (v < 0 or v > 2):
-            raise ValueError('Temperature must be between 0 and 2')
-        return v
-    
-    @validator('max_tokens')
-    def validate_max_tokens(cls, v):
-        if v is not None and (v < 1 or v > 4000):
-            raise ValueError('Max tokens must be between 1 and 4000')
-        return v
 
 class PromptResponse(BaseModel):
     id: int
@@ -81,8 +62,6 @@ class PromptResponse(BaseModel):
     title: Optional[str]
     text: str
     system_prompt: Optional[str]
-    temperature: float
-    max_tokens: int
     last_output: Optional[Dict[str, Any]]
     created_at: datetime
     updated_at: datetime
@@ -103,10 +82,71 @@ class PromptResponse(BaseModel):
     
     class Config:
         from_attributes = True
-        # Add this to handle potential serialization issues
-        json_encoders = {
-            datetime: lambda v: v.isoformat() if v else None
-        }
+
+# New schemas for export/import/sharing
+class PromptExport(BaseModel):
+    """Schema for exporting prompts"""
+    id: int
+    uuid: str
+    title: str
+    text: str
+    system_prompt: Optional[str]
+    provider_name: str
+    model_name: str
+    tags: List[str] = []
+    description: Optional[str]
+    category: Optional[str]
+    difficulty: Optional[str]  # beginner, intermediate, advanced
+    use_cases: List[str] = []
+    created_at: datetime
+    updated_at: datetime
+    metadata: Dict[str, Any] = {}
+    
+    class Config:
+        from_attributes = True
+
+class PromptImport(BaseModel):
+    """Schema for importing prompts"""
+    title: str
+    text: str
+    system_prompt: Optional[str]
+    provider_name: Optional[str]  # If not specified, use default
+    model_name: Optional[str]     # If not specified, use default
+    tags: List[str] = []
+    description: Optional[str]
+    category: Optional[str]
+    difficulty: Optional[str]
+    use_cases: List[str] = []
+    metadata: Dict[str, Any] = {}
+
+class PromptShare(BaseModel):
+    """Schema for sharing prompts"""
+    prompt_id: int
+    is_public: bool = False
+    allow_copying: bool = True
+    require_attribution: bool = False
+    license: Optional[str] = "MIT"
+    share_notes: Optional[str]
+
+class PromptTemplate(BaseModel):
+    """Standardized prompt template format"""
+    name: str
+    version: str = "1.0.0"
+    description: str
+    author: str
+    prompt_template: str
+    system_prompt: Optional[str]
+    variables: List[Dict[str, str]] = []  # [{"name": "variable", "description": "what it does"}]
+    examples: List[Dict[str, str]] = []
+    tags: List[str] = []
+    category: str
+    difficulty: str
+    use_cases: List[str] = []
+    requirements: List[str] = []
+    license: str = "MIT"
+    created_at: datetime
+    updated_at: datetime
+
 
 class PromptRun(BaseModel):
     prompt_id: Optional[int] = None  # If None, creates new prompt
@@ -115,8 +155,7 @@ class PromptRun(BaseModel):
     text: str
     title: Optional[str] = None
     system_prompt: Optional[str] = None
-    temperature: Optional[float] = 0.7
-    max_tokens: Optional[int] = 1000
+
 
 
 

@@ -49,8 +49,6 @@ class Prompt(Base):
     title = Column(String(255), nullable=False)
     text = Column(Text, nullable=False)
     system_prompt = Column(Text)  # Optional system message
-    temperature = Column(Float, default=0.7)
-    max_tokens = Column(Integer, default=1000)
     last_output = Column(JSON)  # Store the last output for quick access
     is_active = Column(Boolean, default=True)  # Track if prompt is active or archived
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -70,14 +68,15 @@ class PromptVersion(Base):
     version_number = Column(Integer, nullable=False)
     prompt_text = Column(Text, nullable=False)
     system_prompt = Column(Text)
-    temperature = Column(Float, default=0.7)
-    max_tokens = Column(Integer, default=1000)
     provider_id = Column(Integer, ForeignKey("providers.id"), nullable=False)
     model_id = Column(Integer, ForeignKey("models.id"), nullable=False)
     files = Column(JSON)  # Store file metadata
     images = Column(JSON)  # Store image metadata
     include_file_content = Column(Boolean, default=True)
     file_content_prefix = Column(String(255), default="File content:\n")
+    # Structured Output fields
+    structured_output = Column(Boolean, default=False)  # Whether structured output was enabled
+    json_schema = Column(Text)  # Store the JSON schema as text
     output = Column(JSON)  # Store the output that was generated
     locked_by_user = Column(String(100), default="default_user")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

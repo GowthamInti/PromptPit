@@ -13,6 +13,9 @@ from app.schemas.provider_schemas import (
 from app.services.provider_service import ProviderService
 from app.services.file_extraction_service import FileExtractionService
 import time
+from datetime import datetime
+from sqlalchemy import func
+import json
 
 # Image processing functions
 async def process_image(image_file: UploadFile) -> str:
@@ -81,8 +84,7 @@ async def create_prompt(
             title=prompt_data.title,
             text=prompt_data.text,
             system_prompt=prompt_data.system_prompt,
-            temperature=prompt_data.temperature,
-            max_tokens=prompt_data.max_tokens,
+
             user_id=prompt_data.user_id
         )
         
@@ -139,8 +141,6 @@ def get_prompts_with_versions(
                 "title": prompt.title,
                 "text": prompt.text,
                 "system_prompt": prompt.system_prompt,
-                "temperature": prompt.temperature,
-                "max_tokens": prompt.max_tokens,
                 "provider_id": prompt.provider_id,
                 "provider_name": provider.name if provider else None,
                 "model_id": prompt.model_id,
@@ -155,8 +155,6 @@ def get_prompts_with_versions(
                         "version_number": version.version_number,
                         "prompt_text": version.prompt_text,
                         "system_prompt": version.system_prompt,
-                        "temperature": version.temperature,
-                        "max_tokens": version.max_tokens,
                         "files": version.files,
                         "images": version.images,
                         "output": version.output,
@@ -303,8 +301,7 @@ async def update_prompt(
         prompt.title = prompt_data.title
         prompt.text = prompt_data.text
         prompt.system_prompt = prompt_data.system_prompt
-        prompt.temperature = prompt_data.temperature
-        prompt.max_tokens = prompt_data.max_tokens
+
         # Note: version is now handled by the prompt_versions table
         
         db.commit()
@@ -345,11 +342,12 @@ async def run_prompt(
     text: str = Form(...),
     title: Optional[str] = Form(None),
     system_prompt: Optional[str] = Form(None),
-    temperature: Optional[float] = Form(0.7),
-    max_tokens: Optional[int] = Form(1000),
+
     include_file_content: Optional[bool] = Form(True),
     file_content_prefix: Optional[str] = Form("File content:\n"),
     knowledge_base_id: Optional[int] = Form(None),
+    structured_output: Optional[bool] = Form(False),
+    json_schema: Optional[str] = Form(None),
     files: List[UploadFile] = File(default=[]),
     images: List[UploadFile] = File(default=[]),
     db: Session = Depends(get_db)
@@ -408,17 +406,16 @@ async def run_prompt(
                     
                     # Enhance the prompt with RAG context
                     if rag_context:
-                        enhanced_text = f"""Based on the following context information:
+                        enhanced_text = f"""Please Use the below information as well in Generating the report 
+                                                {rag_context}
 
-{rag_context}
-
-Question: {text}
-
-Please answer the question using the provided context. If the context doesn't contain enough information to answer the question, please say so."""
+                                                Request: {text}"""
                         text = enhanced_text
+
                         
             except Exception as e:
                 print(f"RAG search error: {str(e)}")
+
                 # Continue without RAG context if search fails
         
         # Execute the prompt using the provider service
@@ -431,10 +428,10 @@ Please answer the question using the provided context. If the context doesn't co
                 "model_name": model.name,
                 "text": text,
                 "system_prompt": system_prompt,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
                 "include_file_content": include_file_content,
-                "file_content_prefix": file_content_prefix
+                "file_content_prefix": file_content_prefix,
+                "structured_output": structured_output,
+                "json_schema": json_schema
             }
             
             # Add files if present
@@ -451,7 +448,6 @@ Please answer the question using the provided context. If the context doesn't co
                             "type": "image_url",
                             "image_url": {
                                 "url": base64_image,
-                                "detail": "low"
                             }
                         })
                 
@@ -658,8 +654,7 @@ async def create_and_lock_prompt(
             title=version_data.get("title", "Untitled Prompt"),
             text=version_data.get("prompt_text", ""),
             system_prompt=version_data.get("system_prompt", ""),
-            temperature=version_data.get("temperature", 0.7),
-            max_tokens=version_data.get("max_tokens", 1000),
+
             user_id=version_data.get("user_id", "default_user")
         )
         
@@ -782,14 +777,14 @@ async def lock_prompt_version_internal(
             version_number=version_number,
             prompt_text=version_data.get("prompt_text", prompt.text if prompt else ""),
             system_prompt=version_data.get("system_prompt", prompt.system_prompt if prompt else ""),
-            temperature=version_data.get("temperature", prompt.temperature if prompt else 0.7),
-            max_tokens=version_data.get("max_tokens", prompt.max_tokens if prompt else 1000),
             provider_id=version_data.get("provider_id", prompt.provider_id if prompt else None),
             model_id=version_data.get("model_id", prompt.model_id if prompt else None),
             files=files_metadata,
             images=images_metadata,
             include_file_content=version_data.get("include_file_content", True),
             file_content_prefix=version_data.get("file_content_prefix", "File content:\n"),
+            structured_output=version_data.get("structured_output", False),
+            json_schema=version_data.get("json_schema"),
             output=output_data,
             locked_by_user=version_data.get("locked_by_user", "default_user")
         )
@@ -839,8 +834,7 @@ def get_prompt_versions(
             "version_number": version.version_number,
             "prompt_text": version.prompt_text,
             "system_prompt": version.system_prompt,
-            "temperature": version.temperature,
-            "max_tokens": version.max_tokens,
+
             "provider_id": version.provider_id,
             "model_id": version.model_id,
             "model_name": db.query(Model).filter(Model.id == version.model_id).first().name if version.model_id else None,
@@ -848,6 +842,8 @@ def get_prompt_versions(
             "images": version.images,
             "include_file_content": version.include_file_content,
             "file_content_prefix": version.file_content_prefix,
+            "structured_output": version.structured_output,
+            "json_schema": version.json_schema,
             "output": version.output,
             "locked_by_user": version.locked_by_user,
             "created_at": version.created_at
@@ -876,8 +872,7 @@ async def duplicate_prompt(
             title=f"{original_prompt.title} (Copy)",
             text=original_prompt.text,
             system_prompt=original_prompt.system_prompt,
-            temperature=original_prompt.temperature,
-            max_tokens=original_prompt.max_tokens,
+
             last_output=original_prompt.last_output
         )
         
@@ -890,3 +885,290 @@ async def duplicate_prompt(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to duplicate prompt: {str(e)}")
+
+# Individual prompt export/import endpoints
+@router.get("/prompts/{prompt_id}/export")
+async def export_prompt(
+    prompt_id: int,
+    format: str = "json",  # json, markdown, template
+    include_versions: bool = True,
+    include_outputs: bool = True,
+    db: Session = Depends(get_db)
+):
+    """Export a specific prompt with its versions"""
+    try:
+        # Get the prompt
+        prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+        if not prompt:
+            raise HTTPException(status_code=404, detail="Prompt not found")
+        
+        # Get provider and model names
+        provider = db.query(Provider).filter(Provider.id == prompt.provider_id).first()
+        model = db.query(Model).filter(Model.id == prompt.model_id).first()
+        
+        prompt_data = {
+            "export_info": {
+                "exported_at": datetime.now().isoformat(),
+                "format": format,
+                "prompt_id": prompt_id,
+                "include_versions": include_versions,
+                "include_outputs": include_outputs
+            },
+            "prompt": {
+                "id": prompt.id,
+                "uuid": prompt.uuid,
+                "title": prompt.title,
+                "text": prompt.text,
+                "system_prompt": prompt.system_prompt,
+                "provider_name": provider.name if provider else "unknown",
+                "model_name": model.name if model else "unknown",
+                "created_at": prompt.created_at.isoformat(),
+                "updated_at": prompt.updated_at.isoformat(),
+                "last_output": prompt.last_output if include_outputs else None
+            }
+        }
+        
+        # Add versions if requested
+        if include_versions:
+            versions = db.query(PromptVersion).filter(
+                PromptVersion.prompt_id == prompt.id
+            ).order_by(PromptVersion.version_number.desc()).all()
+            
+            prompt_data["prompt"]["versions"] = []
+            for version in versions:
+                version_data = {
+                    "version_number": version.version_number,
+                    "prompt_text": version.prompt_text,
+                    "system_prompt": version.system_prompt,
+                    "provider_name": provider.name if provider else "unknown",
+                    "model_name": model.name if model else "unknown",
+                    "files": version.files,
+                    "images": version.images,
+                    "structured_output": version.structured_output,
+                    "json_schema": version.json_schema,
+                    "output": version.output if include_outputs else None,
+                    "locked_by_user": version.locked_by_user,
+                    "created_at": version.created_at.isoformat()
+                }
+                prompt_data["prompt"]["versions"].append(version_data)
+        
+        if format == "markdown":
+            return export_prompt_as_markdown(prompt_data)
+        elif format == "template":
+            return export_prompt_as_template(prompt_data)
+        else:
+            return prompt_data
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to export prompt: {str(e)}")
+
+@router.post("/prompts/import")
+async def import_prompt(
+    file: UploadFile = File(...),
+    user_id: str = "default_user",
+    db: Session = Depends(get_db)
+):
+    """Import a prompt from an export file"""
+    try:
+        # Read file content
+        content = await file.read()
+        
+        # Try to parse as JSON
+        try:
+            import_data = json.loads(content.decode('utf-8'))
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON file")
+        
+        # Validate import data structure
+        if "prompt" not in import_data:
+            raise HTTPException(status_code=400, detail="Invalid export file format")
+        
+        prompt_info = import_data["prompt"]
+        
+        # Check if prompt with same title already exists
+        existing_prompt = db.query(Prompt).filter(
+            Prompt.title == prompt_info["title"],
+            Prompt.user_id == user_id,
+            Prompt.is_active == True
+        ).first()
+        
+        if existing_prompt:
+            # Automatically append "(Copy)" to the title instead of requiring overwrite
+            base_title = prompt_info["title"]
+            copy_counter = 1
+            new_title = f"{base_title} (Copy)"
+            
+            # Keep trying with incrementing numbers if multiple copies exist
+            while db.query(Prompt).filter(
+                Prompt.title == new_title,
+                Prompt.user_id == user_id,
+                Prompt.is_active == True
+            ).first():
+                copy_counter += 1
+                new_title = f"{base_title} (Copy {copy_counter})"
+            
+            prompt_info["title"] = new_title
+            print(f"Prompt with title '{base_title}' already exists. Creating as '{new_title}'")
+        
+        # Get or create provider and model
+        provider = db.query(Provider).filter(Provider.name == prompt_info["provider_name"]).first()
+        if not provider:
+            # Create default provider if not found
+            provider = Provider(name=prompt_info["provider_name"], api_key="", is_active=True)
+            db.add(provider)
+            db.commit()
+            db.refresh(provider)
+        
+        model = db.query(Model).filter(Model.name == prompt_info["model_name"]).first()
+        if not model:
+            # Create default model if not found
+            model = Model(name=prompt_info["model_name"], provider_id=provider.id, is_active=True)
+            db.add(model)
+            db.commit()
+            db.refresh(model)
+        
+        # Create or update prompt
+        prompt = Prompt(
+            provider_id=provider.id,
+            model_id=model.id,
+            title=prompt_info["title"],
+            text=prompt_info["text"],
+            system_prompt=prompt_info["system_prompt"],
+            last_output=prompt_info.get("last_output"),
+            user_id=user_id
+        )
+        db.add(prompt)
+        db.commit()
+        db.refresh(prompt)
+        
+        # Import versions if they exist
+        imported_versions = []
+        if "versions" in prompt_info and prompt_info["versions"]:
+            for version_info in prompt_info["versions"]:
+                # Check if version already exists
+                existing_version = db.query(PromptVersion).filter(
+                    PromptVersion.prompt_id == prompt.id,
+                    PromptVersion.version_number == version_info["version_number"]
+                ).first()
+                
+                if not existing_version:
+                    version = PromptVersion(
+                        prompt_id=prompt.id,
+                        version_number=version_info["version_number"],
+                        prompt_text=version_info["prompt_text"],
+                        system_prompt=version_info["system_prompt"],
+                        provider_id=provider.id,
+                        model_id=model.id,
+                        files=version_info.get("files"),
+                        images=version_info.get("images"),
+                        structured_output=version_info.get("structured_output", False),
+                        json_schema=version_info.get("json_schema"),
+                        output=version_info.get("output"),
+                        locked_by_user=version_info.get("locked_by_user", user_id)
+                    )
+                    db.add(version)
+                    imported_versions.append(version)
+        
+        db.commit()
+        
+        return {
+            "message": "Prompt imported successfully",
+            "prompt_id": prompt.id,
+            "prompt_title": prompt.title,
+            "versions_imported": len(imported_versions),
+            "was_copied": existing_prompt is not None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to import prompt: {str(e)}")
+
+def export_prompt_as_markdown(prompt_data):
+    """Export prompt as markdown format"""
+    prompt = prompt_data["prompt"]
+    export_info = prompt_data["export_info"]
+    
+    markdown = f"""# {prompt['title']}
+
+**Exported on:** {export_info['exported_at']}  
+**Provider:** {prompt['provider_name']}  
+**Model:** {prompt['model_name']}  
+**Created:** {prompt['created_at']}  
+**Updated:** {prompt['updated_at']}
+
+## Prompt Text
+{prompt['text']}
+
+"""
+    
+    if prompt['system_prompt']:
+        markdown += f"""## System Prompt
+{prompt['system_prompt']}
+
+"""
+    
+    if prompt.get('last_output'):
+        markdown += f"""## Last Output
+```json
+{json.dumps(prompt['last_output'], indent=2)}
+```
+
+"""
+    
+    if 'versions' in prompt and prompt['versions']:
+        markdown += "## Versions\n\n"
+        for version in prompt['versions']:
+            markdown += f"""### Version {version['version_number']}
+**Created:** {version['created_at']}  
+**Locked by:** {version['locked_by_user']}
+
+{version['prompt_text']}
+
+"""
+            if version['system_prompt']:
+                markdown += f"**System Prompt:** {version['system_prompt']}\n\n"
+            
+            if version.get('structured_output'):
+                markdown += f"**Structured Output:** Enabled\n"
+                if version.get('json_schema'):
+                    markdown += f"**JSON Schema:**\n```json\n{version['json_schema']}\n```\n\n"
+            
+            if version.get('output'):
+                markdown += f"**Output:**\n```json\n{json.dumps(version['output'], indent=2)}\n```\n\n"
+    
+    return {"content": markdown, "filename": f"{prompt['title'].replace(' ', '_')}.md"}
+
+def export_prompt_as_template(prompt_data):
+    """Export prompt as template format"""
+    prompt = prompt_data["prompt"]
+    export_info = prompt_data["export_info"]
+    
+    template = {
+        "name": prompt['title'],
+        "version": "1.0.0",
+        "description": f"Exported prompt: {prompt['title']}",
+        "author": "Prompt Playground",
+        "prompt_template": prompt['text'],
+        "system_prompt": prompt['system_prompt'],
+        "variables": [],
+        "examples": [],
+        "tags": [],
+        "category": "imported",
+        "difficulty": "intermediate",
+        "use_cases": [],
+        "requirements": [],
+        "license": "MIT",
+        "created_at": prompt['created_at'],
+        "updated_at": prompt['updated_at'],
+        "metadata": {
+            "original_provider": prompt['provider_name'],
+            "original_model": prompt['model_name'],
+            "exported_at": export_info['exported_at']
+        }
+    }
+    
+    return {"content": template, "filename": f"{prompt['title'].replace(' ', '_')}_template.json"}
+
+# Remove workspace-level export/import endpoints - individual prompt export/import is sufficient

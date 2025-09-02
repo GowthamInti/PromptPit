@@ -89,7 +89,8 @@ async def health_check(db: Session = Depends(get_db)):
     """
     try:
         # Test database connection
-        result = db.execute("SELECT 1").fetchone()
+        from sqlalchemy import text
+        result = db.execute(text("SELECT 1")).fetchone()
         db_status = "healthy" if result else "unhealthy"
         
         # Get basic stats

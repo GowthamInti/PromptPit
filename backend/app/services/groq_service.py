@@ -126,12 +126,8 @@ class GroqService:
         if prompt_data.get("system_prompt"):
             messages.append({"role": "system", "content": prompt_data["system_prompt"]})
         
-        # Handle file content if provided
+        # File content is now already integrated into the text
         user_content = prompt_data["text"]
-        if prompt_data.get("file_content"):
-            file_content = prompt_data["file_content"]
-            file_content_prefix = prompt_data.get("file_content_prefix", "File content:\n")
-            user_content = f"{file_content_prefix}{file_content}\n\nUser prompt: {user_content}"
         
         # Handle image contents if provided (for visual question answering)
         if prompt_data.get("image_contents"):
@@ -149,12 +145,10 @@ class GroqService:
         else:
             # Regular text-only message
             messages.append({"role": "user", "content": user_content})
-
         response = await client.chat.completions.create(
             model=prompt_data["model_name"],
             messages=messages,
-            temperature=prompt_data.get("temperature", 0.7),
-            max_tokens=prompt_data.get("max_tokens", 1000)
+            response_format=prompt_data.get("response_format")
         )
 
         return {
@@ -166,7 +160,8 @@ class GroqService:
             },
             "response_metadata": {
                 "model": response.model,
-                "finish_reason": response.choices[0].finish_reason
+                "finish_reason": response.choices[0].finish_reason,
+                "response_format": prompt_data.get("response_format")
             }
         }
 
