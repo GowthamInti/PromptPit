@@ -4,17 +4,20 @@ FROM node:18-alpine AS build
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files first for better caching
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install ALL dependencies (including dev dependencies needed for build)
+RUN npm ci --silent
 
 # Copy source code
 COPY . .
 
 # Build the application
 RUN npm run build
+
+# Remove dev dependencies to reduce image size
+RUN npm prune --production
 
 # Production stage
 FROM nginx:alpine
