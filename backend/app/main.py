@@ -68,7 +68,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Frontend URLs
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8000", "http://127.0.0.1:8000"],  # Frontend URLs + Backend serving frontend
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
@@ -118,6 +118,12 @@ async def health_check(db: Session = Depends(get_db)):
 # Serve frontend static files (for production deployment)
 if os.path.exists("static"):
     app.mount("/", StaticFiles(directory="static", html=True), name="static")
+    
+    # Catch-all route to serve index.html for client-side routing
+    @app.get("/{full_path:path}")
+    async def catch_all(full_path: str):
+        from fastapi.responses import FileResponse
+        return FileResponse("static/index.html")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

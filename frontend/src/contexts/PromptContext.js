@@ -19,11 +19,6 @@ export const PromptProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Fetch prompts on mount
-  useEffect(() => {
-    fetchPrompts();
-  }, []);
-
   const fetchPrompts = useCallback(async () => {
     try {
       setLoading(true);
@@ -36,6 +31,11 @@ export const PromptProvider = ({ children }) => {
       setLoading(false);
     }
   }, []);
+
+  // Fetch prompts on mount
+  useEffect(() => {
+    fetchPrompts();
+  }, [fetchPrompts]);
 
   const fetchPromptVersions = useCallback(async (promptId) => {
     try {
@@ -145,6 +145,21 @@ export const PromptProvider = ({ children }) => {
     }
   }, []);
 
+  const runPromptWithProvider = useCallback(async (promptData, providerId, modelId) => {
+    try {
+      setLoading(true);
+      const response = await apiService.runPromptWithProvider(promptData, providerId, modelId);
+      return response.data;
+    } catch (error) {
+      console.error('Error running prompt with provider:', error);
+      const errorMessage = error.response?.data?.detail || 'Failed to run prompt';
+      toast.error(errorMessage);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const deletePrompt = useCallback(async (promptId) => {
     try {
       await api.delete(`/api/prompts/${promptId}`);
@@ -200,6 +215,7 @@ export const PromptProvider = ({ children }) => {
     lockPromptVersion,
     createAndLockPrompt,
     runPrompt,
+    runPromptWithProvider,
     deletePrompt,
     duplicatePrompt,
     deletePromptVersion,

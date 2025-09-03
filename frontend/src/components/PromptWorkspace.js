@@ -356,7 +356,7 @@ const PromptWorkspace = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="h-full p-6 space-y-6 animate-fade-in">
       {/* Header */}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>

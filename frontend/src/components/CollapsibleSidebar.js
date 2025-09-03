@@ -8,12 +8,14 @@ import {
   ChevronRightIcon,
   MapPinIcon,
   Bars3Icon,
-  XMarkIcon
+  XMarkIcon,
+  ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
   { name: 'Prompt Engineering', href: '/editor', icon: PencilIcon },
+  { name: 'Chat', href: '/chat', icon: ChatBubbleLeftRightIcon },
   { name: 'Knowledge Base', href: '/knowledge-base', icon: DocumentIcon },
 ];
 
@@ -185,10 +187,8 @@ const CollapsibleSidebar = ({ children }) => {
         </div>
 
         {/* Page content */}
-        <main className="py-6">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            {children}
-          </div>
+        <main className="h-full w-full">
+          {children}
         </main>
       </div>
     </div>

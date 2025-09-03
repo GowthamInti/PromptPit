@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api, apiService } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -19,19 +19,7 @@ export const ProviderProvider = ({ children }) => {
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [selectedModel, setSelectedModel] = useState(null);
 
-  // Fetch providers on mount
-  useEffect(() => {
-    fetchProviders();
-  }, []);
-
-  // Fetch models when providers change
-  useEffect(() => {
-    if (providers.length > 0) {
-      fetchModels();
-    }
-  }, [providers]);
-
-  const fetchProviders = async () => {
+  const fetchProviders = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get('/api/providers');
@@ -48,9 +36,9 @@ export const ProviderProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedProvider]);
 
-  const fetchModels = async () => {
+  const fetchModels = useCallback(async () => {
     try {
       const response = await api.get('/api/models');
       setModels(response.data);
@@ -63,7 +51,19 @@ export const ProviderProvider = ({ children }) => {
       console.error('Error fetching models:', error);
       toast.error('Failed to fetch models');
     }
-  };
+  }, [selectedModel]);
+
+  // Fetch providers on mount
+  useEffect(() => {
+    fetchProviders();
+  }, [fetchProviders]);
+
+  // Fetch models when providers change
+  useEffect(() => {
+    if (providers.length > 0) {
+      fetchModels();
+    }
+  }, [providers, fetchModels]);
 
   const addProvider = async (providerData) => {
     try {
@@ -71,7 +71,6 @@ export const ProviderProvider = ({ children }) => {
       await fetchProviders(); // Refresh the providers list
       
       // Show success message with model refresh info
-      const modelsRefreshed = response.data.models_refreshed || 0;
       const message = response.data.message || `${providerData.name} API key added successfully`;
       toast.success(message);
       
@@ -93,7 +92,6 @@ export const ProviderProvider = ({ children }) => {
       await fetchProviders(); // Refresh the providers list
       
       // Show success message with model refresh info
-      const modelsRefreshed = response.data.models_refreshed || 0;
       const message = response.data.message || `${providerName} API key updated successfully`;
       toast.success(message);
       

@@ -115,6 +115,54 @@ export const apiService = {
       },
     });
   },
+
+  runPromptWithProvider: (data, providerId, modelId) => {
+    const formData = new FormData();
+    
+    // Add provider and model IDs
+    formData.append('provider_id', providerId);
+    formData.append('model_id', modelId);
+    
+    // Add all the prompt data with proper type conversion
+    Object.keys(data).forEach(key => {
+      if (key !== 'files' && key !== 'images') {
+        let value = data[key];
+        // Convert boolean to string for FormData
+        if (typeof value === 'boolean') {
+          value = value.toString();
+        }
+        // Convert numbers to string for FormData
+        if (typeof value === 'number') {
+          value = value.toString();
+        }
+        // Handle null/undefined values
+        if (value === null || value === undefined) {
+          value = '';
+        }
+        formData.append(key, value);
+      }
+    });
+    
+    // Add files if present
+    if (data.files && data.files.length > 0) {
+      data.files.forEach(file => {
+        formData.append('files', file);
+      });
+    }
+
+    // Add images if present
+    if (data.images && data.images.length > 0) {
+      data.images.forEach(image => {
+        formData.append('images', image);
+      });
+    }
+    
+    return api.post('/api/run', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
   getSupportedFileTypes: () => api.get('/api/supported-file-types'),
   testFormData: (data) => {
     const formData = new FormData();
@@ -155,17 +203,113 @@ export const apiService = {
   // Knowledge Base endpoints
   getKnowledgeBases: () => api.get('/api/knowledge-bases'),
   createKnowledgeBase: (data) => api.post('/api/knowledge-bases', data),
+  getKnowledgeBase: (kbId) => api.get(`/api/knowledge-bases/${kbId}`),
+  updateKnowledgeBase: (kbId, data) => api.put(`/api/knowledge-bases/${kbId}`, data),
   deleteKnowledgeBase: (kbId) => api.delete(`/api/knowledge-bases/${kbId}`),
-  getKnowledgeBaseContents: (kbId) => api.get(`/api/knowledge-bases/${kbId}/contents`),
-  uploadFilesToKnowledgeBase: (kbId, formData) => api.post(`/api/knowledge-bases/${kbId}/upload`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
-  addTextToKnowledgeBase: (kbId, data) => api.post(`/api/knowledge-bases/${kbId}/text`, data),
-  processKnowledgeBaseFiles: (kbId) => api.post(`/api/knowledge-bases/${kbId}/process`),
-  getKnowledgeBaseContent: (kbId, contentId) => api.get(`/api/knowledge-bases/${kbId}/contents/${contentId}`),
+  
+  // Content endpoints (ChromaDB-based only)
+  getKnowledgeBaseContents: (kbId) => api.get(`/api/knowledge-bases/${kbId}/contents/chroma`),
+  getKnowledgeBaseContent: (kbId, contentId) => api.get(`/api/knowledge-bases/${kbId}/contents/${contentId}/chroma`),
   deleteKnowledgeBaseContent: (kbId, contentId) => api.delete(`/api/knowledge-bases/${kbId}/contents/${contentId}`),
-  updateContentSummary: (contentId, data) => api.put(`/api/knowledge-bases/contents/${contentId}/summary`, data),
-  processContentWithLLM: (kbId, contentId, data) => api.post(`/api/knowledge-bases/${kbId}/contents/${contentId}/process`, data),
+  
+  // Content processing endpoints
+  getProcessingStatus: (kbId, contentId) => api.get(`/api/knowledge-bases/${kbId}/contents/${contentId}/status`),
+  
+  // Chat endpoints
+  startChatConversation: (sessionId, systemPrompt) => {
+    const formData = new FormData();
+    formData.append('session_id', sessionId);
+    if (systemPrompt) {
+      formData.append('system_prompt', systemPrompt);
+    }
+    return api.post('/api/chat/start', formData);
+  },
+
+  sendChatMessage: (message, sessionId, providerId, modelId, systemPrompt, files = [], images = []) => {
+    const formData = new FormData();
+    formData.append('message', message);
+    if (sessionId) {
+      formData.append('session_id', sessionId);
+    }
+    formData.append('provider_id', providerId);
+    formData.append('model_id', modelId);
+    if (systemPrompt) {
+      formData.append('system_prompt', systemPrompt);
+    }
+    
+    // Add files to FormData
+    if (files && files.length > 0) {
+      files.forEach((file, index) => {
+        formData.append('files', file);
+      });
+    }
+    
+    // Add images to FormData
+    if (images && images.length > 0) {
+      images.forEach((image, index) => {
+        formData.append('images', image);
+      });
+    }
+    
+    return api.post('/api/chat/send', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
+  getChatHistory: (sessionId, limit = 50) => api.get(`/api/chat/${sessionId}/history?limit=${limit}`),
+  clearChatConversation: (sessionId) => api.delete(`/api/chat/${sessionId}`),
+  updateChatSystemPrompt: (sessionId, systemPrompt) => api.put(`/api/chat/${sessionId}/system-prompt`, { system_prompt: systemPrompt }),
+  getActiveChatConversations: () => api.get('/api/chat/active'),
+  getChatConversationStatus: (sessionId) => api.get(`/api/chat/${sessionId}/status`),
+  
+  // Search endpoints
+  searchKnowledgeBase: (kbId, data) => api.post(`/api/knowledge-bases/${kbId}/search`, data),
+  getRagPreview: (data) => {
+    const formData = new FormData();
+    formData.append('knowledge_base_id', data.knowledge_base_id);
+    formData.append('query', data.query);
+    
+    return api.post('/api/rag-preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  addContentToKnowledgeBase: (data, kbId) => {
+    const formData = new FormData();
+    
+    // Debug logging
+    console.log('addContentToKnowledgeBase called with:', { data, kbId });
+    
+    // Ensure required parameters are present
+    if (!data.summary) {
+      throw new Error('Summary is required for adding content to knowledge base');
+    }
+    
+    // Add all the data with proper type conversion
+    Object.keys(data).forEach(key => {
+      let value = data[key];
+      // Convert boolean to string for FormData
+      if (typeof value === 'boolean') {
+        value = value.toString();
+      }
+      // Convert numbers to string for FormData
+      if (typeof value === 'number') {
+        value = value.toString();
+      }
+      // Handle null/undefined values
+      if (value === null || value === undefined) {
+        value = '';
+      }
+      formData.append(key, value);
+      console.log(`FormData: ${key} = ${value}`);
+    });
+    
+    return api.post(`/api/knowledge-bases/${kbId}/add-content`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
   runLLMWithFiles: (data) => {
     const formData = new FormData();
     
@@ -212,122 +356,19 @@ export const apiService = {
   
   // Health check 
   healthCheck: () => api.get('/api/health'),
+  
+  // Individual prompt export/import
+  exportPrompt: (promptId, format = 'json', includeVersions = true, includeOutputs = true) => 
+    api.get(`/api/prompts/${promptId}/export`, { 
+      params: { format, include_versions: includeVersions, include_outputs: includeOutputs } 
+    }),
+  importPrompt: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/api/prompts/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
 };
 
-export default api;
-
-
-const apiServiceExtensions = {
-  // Get a specific prompt
-  getPrompt: (promptId) => {
-    return api.get(`/prompts/${promptId}`);
-  },
-
-  // Create a new prompt
-  createPrompt: (promptData) => {
-    return api.post('/prompts', promptData);
-  },
-
-  // Update an existing prompt
-  updatePrompt: (promptId, promptData) => {
-    return api.put(`/prompts/${promptId}`, promptData);
-  },
-
-  // Get prompt versions
-  getPromptVersions: (promptId) => {
-    return api.get(`/prompts/${promptId}/versions`);
-  },
-
-  // Lock a prompt version
-  lockPromptVersion: (promptId, versionData) => {
-    return api.post(`/prompts/${promptId}/versions`, versionData);
-  },
-
-  // Get all outputs
-  getOutputs: () => {
-    return api.get('/outputs');
-  },
-
-  // Get outputs for a specific prompt
-  getPromptOutputs: (promptId) => {
-    return api.get(`/prompts/${promptId}/outputs`);
-  },
-
-  // Get a specific output
-  getOutput: (outputId) => {
-    return api.get(`/outputs/${outputId}`);
-  },
-
-  // Test form data (for debugging)
-  testFormData: (data) => {
-    const formData = new FormData();
-    
-    // Add regular fields
-    Object.keys(data).forEach(key => {
-      if (key !== 'files' && data[key] !== undefined && data[key] !== null) {
-        formData.append(key, data[key]);
-      }
-    });
-    
-    // Add files
-    if (data.files && data.files.length > 0) {
-      data.files.forEach(file => {
-        formData.append('files', file);
-      });
-    }
-    
-    return api.post('/test-form-data', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-  },
-
-  // Enhanced runPrompt method with file support
-  runPrompt: (data) => {
-    const formData = new FormData();
-    
-    // Add all form fields
-    const fields = [
-      'prompt_id', 'provider_id', 'model_id', 'text', 'title', 
-      'system_prompt', 'temperature', 'max_tokens', 'include_file_content', 
-      'file_content_prefix'
-    ];
-    
-    fields.forEach(field => {
-      if (data[field] !== undefined && data[field] !== null) {
-        formData.append(field, data[field]);
-      }
-    });
-    
-    // Add files
-    if (data.files && data.files.length > 0) {
-      data.files.forEach(file => {
-        formData.append('files', file);
-      });
-    }
-    
-    // Add images
-    if (data.images && data.images.length > 0) {
-      data.images.forEach(image => {
-        formData.append('images', image);
-      });
-    }
-    
-    return api.post('/run', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-  },
-
-  // Get supported file types
-  getSupportedFileTypes: () => {
-    return api.get('/supported-file-types');
-  }
-};
-
-// If you're using a module system, export these extensions
-// or merge them with your existing apiService object
-
-export { apiServiceExtensions };
+export default apiService;

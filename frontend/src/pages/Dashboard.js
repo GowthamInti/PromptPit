@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   PlusIcon, 
@@ -7,13 +7,15 @@ import {
   TrashIcon,
   KeyIcon,
   EllipsisVerticalIcon,
-  EyeSlashIcon
+  EyeSlashIcon,
+  ChatBubbleLeftRightIcon,
+  DocumentIcon
 } from '@heroicons/react/24/outline';
 import { useProviders } from '../contexts/ProviderContext';
 import AddProviderModal from '../components/AddProviderModal';
 
 const Dashboard = () => {
-  const { providers, models, loading, addProvider, refreshModels, updateApiKey, deactivateProvider, clearApiKey, permanentlyDeleteProvider } = useProviders();
+  const { providers, models, loading, addProvider, refreshModels, deactivateProvider, clearApiKey, permanentlyDeleteProvider } = useProviders();
   const [showAddProvider, setShowAddProvider] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -50,6 +52,22 @@ const Dashboard = () => {
       icon: SparklesIcon,
       color: 'bg-blue-500',
       iconColor: 'text-blue-400',
+    },
+    {
+      name: 'Chat with AI',
+      description: 'Start a conversation with memory',
+      href: '/chat',
+      icon: ChatBubbleLeftRightIcon,
+      color: 'bg-green-500',
+      iconColor: 'text-green-400',
+    },
+    {
+      name: 'Knowledge Base',
+      description: 'Manage and search your documents',
+      href: '/knowledge-base',
+      icon: DocumentIcon,
+      color: 'bg-purple-500',
+      iconColor: 'text-purple-400',
     },
   ];
 
@@ -102,7 +120,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="h-full p-6 space-y-8 animate-fade-in">
       {/* Header */}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>

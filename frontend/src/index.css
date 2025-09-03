@@ -7,6 +7,8 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
   
+
+  
   body {
     @apply bg-black text-white min-h-screen;
     background-attachment: fixed;
@@ -72,6 +74,8 @@
   .input-field option {
     @apply bg-slate-800 text-white;
   }
+  
+
 
   /* Enhanced card styles */
   .card {
@@ -81,11 +85,15 @@
   .card-header {
     @apply border-b border-slate-700 pb-4 mb-4;
   }
+  
+
 
   /* Glass morphism effect */
   .glass {
     @apply bg-slate-800/90 backdrop-blur-sm border border-slate-700 shadow-lg;
   }
+  
+
 
   /* Enhanced sidebar styles */
   .sidebar-item {
@@ -99,6 +107,8 @@
   .sidebar-item:not(.active) {
     @apply text-slate-300 hover:bg-slate-800 hover:text-white;
   }
+  
+
 
   /* Collapsible sidebar specific styles */
   .sidebar-item.collapsed {

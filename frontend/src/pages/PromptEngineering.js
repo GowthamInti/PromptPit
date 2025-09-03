@@ -8,9 +8,11 @@ import {
   MagnifyingGlassIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  ClockIcon,
-  LockClosedIcon
+  LockClosedIcon,
+  DocumentArrowDownIcon,
+  DocumentArrowUpIcon
 } from '@heroicons/react/24/outline';
+import { apiService } from '../services/api';
 import { usePrompts } from '../contexts/PromptContext';
 import toast from 'react-hot-toast';
 
@@ -28,6 +30,8 @@ const PromptEngineering = () => {
   const [filterProvider, setFilterProvider] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
   const [expandedPrompts, setExpandedPrompts] = useState(new Set());
+  const [exportingPromptId, setExportingPromptId] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     fetchPrompts();
@@ -73,6 +77,73 @@ const PromptEngineering = () => {
       } catch (error) {
         console.error('Error deleting version:', error);
       }
+    }
+  };
+
+
+
+  // Individual prompt export function
+  const handleExportPrompt = async (promptId, promptTitle) => {
+    try {
+      setExportingPromptId(promptId);
+      
+      // Export with all versions and outputs
+      const response = await apiService.exportPrompt(promptId, 'json', true, true);
+      
+      // Create and download the file
+      const blob = new Blob([JSON.stringify(response.data, null, 2)], {
+        type: 'application/json'
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${promptTitle.replace(/[^a-zA-Z0-9]/g, '_')}-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Prompt exported successfully!');
+    } catch (error) {
+      console.error('Error exporting prompt:', error);
+      toast.error('Failed to export prompt');
+    } finally {
+      setExportingPromptId(null);
+    }
+  };
+
+  // Individual prompt import function
+  const handleImportPrompt = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    if (!file.name.endsWith('.json')) {
+      toast.error('Please select a JSON prompt export file');
+      return;
+    }
+    
+    try {
+      setIsImporting(true);
+      
+      const response = await apiService.importPrompt(file);
+      
+      const message = response.data.was_copied 
+        ? `Prompt imported successfully as "${response.data.prompt_title}" (auto-copied due to duplicate title) with ${response.data.versions_imported} versions.`
+        : `Prompt imported successfully! ${response.data.prompt_title} with ${response.data.versions_imported} versions.`;
+      
+      toast.success(message);
+      
+      // Refresh the prompts list
+      await fetchPrompts();
+      
+      // Clear the file input
+      event.target.value = '';
+      
+    } catch (error) {
+      console.error('Error importing prompt:', error);
+      toast.error('Failed to import prompt');
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -152,45 +223,56 @@ const PromptEngineering = () => {
         </div>
       </div>
 
-      {/* Search and Filters */}
+      {/* Search and Filter Controls */}
       <div className="p-6 border-b border-slate-700/50 bg-slate-900">
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="flex-1">
             <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search prompts..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <select
               value={filterProvider}
               onChange={(e) => setFilterProvider(e.target.value)}
-              className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500"
+              className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">All Providers</option>
               {providers.map(provider => (
-                <option key={provider} value={provider}>
-                  {provider}
-                </option>
+                <option key={provider} value={provider}>{provider}</option>
               ))}
             </select>
             
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-blue-500"
+              className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value="created_at">Newest First</option>
-              <option value="updated_at">Recently Updated</option>
-              <option value="title">Alphabetical</option>
+              <option value="created_at">Created Date</option>
+              <option value="updated_at">Updated Date</option>
+              <option value="title">Title</option>
             </select>
+            
+            {/* Individual Prompt Import Button */}
+            <label className="bg-orange-600 hover:bg-orange-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors inline-flex items-center space-x-2 cursor-pointer">
+              <DocumentArrowUpIcon className="h-4 w-4" />
+              <span>{isImporting ? 'Importing...' : 'Import Prompt'}</span>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImportPrompt}
+                className="hidden"
+                disabled={isImporting}
+              />
+            </label>
           </div>
         </div>
       </div>
@@ -280,6 +362,14 @@ const PromptEngineering = () => {
                     
                     <div className="flex items-center space-x-1 ml-2">
                       <button
+                        onClick={() => handleExportPrompt(prompt.id, prompt.title)}
+                        disabled={exportingPromptId === prompt.id}
+                        className="p-2 text-slate-400 hover:text-green-400 transition-colors disabled:opacity-50"
+                        title="Export prompt with versions"
+                      >
+                        <DocumentArrowDownIcon className="h-4 w-4" />
+                      </button>
+                      <button
                         onClick={() => handleDuplicatePrompt(prompt.id)}
                         className="p-2 text-slate-400 hover:text-blue-400 transition-colors"
                         title="Duplicate prompt"
@@ -329,8 +419,6 @@ const PromptEngineering = () => {
                             
                             <div className="flex items-center justify-between text-xs text-slate-500">
                               <div className="flex items-center space-x-4">
-                                <span>Temp: {version.temperature}</span>
-                                <span>Tokens: {version.max_tokens}</span>
                                 {version.files && version.files.length > 0 && (
                                   <span className="text-blue-400">
                                     📎 {version.files.length} file{version.files.length !== 1 ? 's' : ''}

@@ -142,7 +142,6 @@ class ProviderService:
                 structured_note = "\n\nPlease provide your response in the exact JSON format specified by the schema."
                 prompt_data["text"] = prompt_data["text"] + structured_note
                 
-                print(f"Structured output enabled with schema: {json.dumps(schema, indent=2)}")
                 
             except (json.JSONDecodeError, ValueError) as e:
                 print(f"Warning: Invalid JSON schema provided for structured output: {prompt_data['json_schema']}")

@@ -31,7 +31,6 @@ const KnowledgeBase = () => {
   const [selectedKB, setSelectedKB] = useState(null);
   const [contents, setContents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newKB, setNewKB] = useState({ name: '', description: '' });
@@ -52,7 +51,6 @@ const KnowledgeBase = () => {
   // Text input states
   const [textInput, setTextInput] = useState('');
   const [textTitle, setTextTitle] = useState('');
-  const [showTextInput, setShowTextInput] = useState(false);
   
   // Processing states
   const [extractedTexts, setExtractedTexts] = useState([]);
@@ -60,10 +58,8 @@ const KnowledgeBase = () => {
   const [showReview, setShowReview] = useState(false);
   const [processingStep, setProcessingStep] = useState('');
   const [userPrompt, setUserPrompt] = useState('');
-  const [maxSummaryTokens, setMaxSummaryTokens] = useState(2000);
   
   // Summary editing states
-  const [editingSummary, setEditingSummary] = useState(null);
   const [editedSummaries, setEditedSummaries] = useState({});
   
   // Content viewing states
@@ -71,6 +67,8 @@ const KnowledgeBase = () => {
   const [selectedContent, setSelectedContent] = useState(null);
   const [contentDetails, setContentDetails] = useState(null);
   const [loadingContent, setLoadingContent] = useState(false);
+  
+  // Always use ChromaDB for content
 
   // Fetch knowledge bases on component mount
   useEffect(() => {
@@ -99,6 +97,7 @@ const KnowledgeBase = () => {
 
   const fetchContents = async (kbId) => {
     try {
+      // Always use ChromaDB for real-time content
       const response = await apiService.getKnowledgeBaseContents(kbId);
       setContents(response.data.contents);
     } catch (error) {
@@ -109,7 +108,11 @@ const KnowledgeBase = () => {
 
   const createKnowledgeBase = async () => {
     try {
-      const response = await apiService.createKnowledgeBase(newKB);
+      const knowledgeBaseData = {
+        ...newKB,
+        user_id: "default_user"  // Add the required user_id field
+      };
+      const response = await apiService.createKnowledgeBase(knowledgeBaseData);
       setKnowledgeBases([...knowledgeBases, response.data]);
       setShowCreateModal(false);
       setNewKB({ name: '', description: '' });
@@ -149,42 +152,6 @@ const KnowledgeBase = () => {
     setExpandedKBs(newExpanded);
   };
 
-  const handleFileUpload = async (event) => {
-    const files = Array.from(event.target.files);
-    if (!files.length || !selectedKB) return;
-
-    try {
-      setUploading(true);
-      const formData = new FormData();
-      files.forEach(file => formData.append('files', file));
-
-      const response = await apiService.uploadFilesToKnowledgeBase(selectedKB.id, formData);
-
-      toast.success(response.data.message);
-      fetchContents(selectedKB.id);
-    } catch (error) {
-      console.error('Error uploading files:', error);
-      toast.error('Failed to upload files');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const processFiles = async () => {
-    if (!selectedKB) return;
-
-    try {
-      setProcessing(true);
-      const response = await apiService.processKnowledgeBaseFiles(selectedKB.id);
-      toast.success(response.data.message);
-      fetchContents(selectedKB.id);
-    } catch (error) {
-      console.error('Error processing files:', error);
-      toast.error('Failed to process files');
-    } finally {
-      setProcessing(false);
-    }
-  };
 
   const handleFileInput = (event, type) => {
     const files = Array.from(event.target.files);
@@ -214,87 +181,67 @@ const KnowledgeBase = () => {
       return;
     }
 
-    // Debug: Log the selected provider and model
-    console.log('Selected provider:', selectedProvider);
-    console.log('Selected model:', selectedModel);
-
     try {
+      setProcessing(true);
       setProcessingStep('Processing content with LLM...');
       
-      const summaries = [];
-      const extractedTexts = [];
+      // Prepare all content for single LLM call
+      const allContent = [];
+      const contentNames = [];
       
-      // Process files
-      for (let i = 0; i < uploadedFiles.length; i++) {
-        const file = uploadedFiles[i];
-        const promptText = userPrompt.trim() || `Please provide a concise summary of the following document. Focus on key points that would be useful for retrieval:`;
-        
-        const requestData = {
-          provider_id: selectedProvider.id,
-          model_id: selectedModel.id,
-          text: promptText,
-          system_prompt: 'You are a helpful assistant that creates concise, informative summaries.',
-          temperature: 0.3,
-          max_tokens: 300,
-          files: [file]
-        };
-        
-        // Debug: Log what we're sending for files
-        console.log('File processing - Request data:', requestData);
-        
-        const response = await apiService.runLLMWithFiles(requestData);
-        
-        summaries.push(response.data.output_text);
-        extractedTexts.push(`Document: ${file.name} - Content extracted and processed`);
-      }
+      // Add files
+      uploadedFiles.forEach(file => {
+        allContent.push(file);
+        contentNames.push(file.name);
+      });
       
-      // Process images
-      for (let i = 0; i < uploadedImages.length; i++) {
-        const image = uploadedImages[i];
-        const imagePromptText = userPrompt.trim() || `Please describe this image and provide key information that would be useful for retrieval:`;
-        
-        const requestData = {
-          provider_id: selectedProvider.id,
-          model_id: selectedModel.id,
-          text: imagePromptText,
-          system_prompt: 'You are a helpful assistant that creates concise, informative descriptions.',
-          temperature: 0.3,
-          max_tokens: 300,
-          images: [image]
-        };
-        
-        // Debug: Log what we're sending for images
-        console.log('Image processing - Request data:', requestData);
-        
-        const response = await apiService.runLLMWithFiles(requestData);
-        
-        summaries.push(response.data.output_text);
-        extractedTexts.push(`Image: ${image.name} - Content extracted and processed`);
-      }
+      // Add images
+      uploadedImages.forEach(image => {
+        allContent.push(image);
+        contentNames.push(image.name);
+      });
       
-      // Process text input
+      // Add text input
       if (textInput.trim()) {
-        const textPromptText = userPrompt.trim() || `Please provide a concise summary of the following text. Focus on key points that would be useful for retrieval:`;
-        // Combine the prompt with the actual text content
-        const combinedText = `${textPromptText}\n\nText to summarize:\n${textInput}`;
-        
-        const requestData = {
-          provider_id: selectedProvider.id,
-          model_id: selectedModel.id,
-          text: combinedText,
-          system_prompt: 'You are a helpful assistant that creates concise, informative summaries.',
-          temperature: 0.3,
-          max_tokens: 300
-        };
-        
-        // Debug: Log what we're sending
-        console.log('Text processing - Request data:', requestData);
-        
-        const response = await apiService.runLLMWithFiles(requestData);
-        
-        summaries.push(response.data.output_text);
-        extractedTexts.push(`Text: ${textTitle || 'Custom Text'} - ${textInput.substring(0, 100)}...`);
+        allContent.push({ type: 'text', content: textInput, name: textTitle || 'Custom Text' });
+        contentNames.push(textTitle || 'Custom Text');
       }
+      
+      // Create single prompt for all content
+      const promptText = userPrompt.trim() || `Please provide a comprehensive summary of all the following content. Since you're processing multiple items together, create a unified summary that captures the key information from all sources and shows how they relate to each other. Focus on key points that would be useful for knowledge retrieval and search purposes.`;
+      
+      const requestData = {
+        provider_id: selectedProvider.id,
+        model_id: selectedModel.id,
+        text: promptText,
+        system_prompt: 'You are a helpful assistant that creates concise, informative summaries.',
+        files: uploadedFiles,
+        images: uploadedImages
+      };
+      
+      // If there's text input, append it to the prompt
+      if (textInput.trim()) {
+        requestData.text += `\n\nText to summarize:\n${textInput}`;
+      }
+      
+      console.log('Processing all content with single LLM call:', requestData);
+      
+      // Single LLM call for all content
+      const response = await apiService.runLLMWithFiles(requestData);
+      
+      // Parse the response to extract individual summaries
+      const outputText = response.data.output_text;
+      
+      // Split the response into individual summaries (assuming the LLM provides separate summaries)
+      // For now, we'll use the full response for each content item
+      const summaries = Array(allContent.length).fill(outputText);
+      const extractedTexts = contentNames.map((name, index) => {
+        if (allContent[index].type === 'text') {
+          return `Text: ${name} - ${allContent[index].content.substring(0, 100)}...`;
+        } else {
+          return `File: ${name} - Content extracted and processed`;
+        }
+      });
       
       setSummaries(summaries);
       setExtractedTexts(extractedTexts);
@@ -305,6 +252,8 @@ const KnowledgeBase = () => {
       console.error('Error processing content:', error);
       toast.error('Failed to process content');
       setProcessingStep('');
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -312,58 +261,41 @@ const KnowledgeBase = () => {
     if (!selectedKB) return;
 
     try {
-      setProcessingStep('Adding to knowledge base...');
+      setProcessingStep('Adding content to knowledge base...');
       
-      const uploadedContents = [];
+      // Get the unified summary
+      const finalSummary = editedSummaries[0] !== undefined ? editedSummaries[0] : summaries[0];
       
-      // Upload files if any
-      if (uploadedFiles.length > 0 || uploadedImages.length > 0) {
-        const formData = new FormData();
-        [...uploadedFiles, ...uploadedImages].forEach(file => {
-          formData.append('files', file);
-        });
-
-        const uploadResponse = await apiService.uploadFilesToKnowledgeBase(selectedKB.id, formData);
-        uploadedContents.push(...uploadResponse.data.uploaded_contents);
-      }
+      // Create a simplified content object with the processed information
+      const contentData = {
+        provider_id: selectedProvider.id,
+        model_id: selectedModel.id,
+        summary: finalSummary
+      };
       
-      // Add text content if any
-      if (textInput.trim()) {
-        const textResponse = await apiService.addTextToKnowledgeBase(selectedKB.id, {
-          text: textInput,
-          title: textTitle || 'Custom Text Content',
-          description: userPrompt || null
-        });
-        uploadedContents.push(textResponse.data);
-      }
-
-      // Process each content with its summary
-      for (let i = 0; i < uploadedContents.length; i++) {
-        const finalSummary = editedSummaries[i] !== undefined ? editedSummaries[i] : summaries[i] || extractedTexts[i];
-        await apiService.processContentWithLLM(selectedKB.id, uploadedContents[i].id, {
-          provider_id: selectedProvider.id,
-          model_id: selectedModel.id,
-          custom_summary: finalSummary,
-          max_summary_tokens: maxSummaryTokens
-        });
-      }
-
-      toast.success('Content added to knowledge base successfully!');
-      fetchContents(selectedKB.id);
-      setShowReview(false);
-      setShowFileUpload(false);
-      setShowTextInput(false);
+      // Single API call to add all content with summaries
+      const response = await apiService.addContentToKnowledgeBase(contentData, selectedKB.id);
+      
+      toast.success(response.data.message);
+      
+      // Reset states
       setUploadedFiles([]);
       setUploadedImages([]);
       setTextInput('');
       setTextTitle('');
-      setExtractedTexts([]);
+      setUserPrompt('');
       setSummaries([]);
+      setEditedSummaries({});
+      setExtractedTexts([]);
+      setShowReview(false);
       setProcessingStep('');
       
+      // Refresh the knowledge base contents
+      fetchContents(selectedKB.id);
+      
     } catch (error) {
-      console.error('Error adding to knowledge base:', error);
-      toast.error('Failed to add to knowledge base');
+      console.error('Error adding content to knowledge base:', error);
+      toast.error('Failed to add content to knowledge base');
       setProcessingStep('');
     }
   };
@@ -387,23 +319,14 @@ const KnowledgeBase = () => {
         return <PhotoIcon className="h-5 w-5" />;
       case 'text':
         return <DocumentDuplicateIcon className="h-5 w-5" />;
+      case 'unified':
+        return <FolderIcon className="h-5 w-5 text-purple-400" />;
       default:
         return <DocumentIcon className="h-5 w-5" />;
     }
   };
 
-  const handleSummaryEdit = async (contentId, newSummary) => {
-    try {
-      await apiService.updateContentSummary(contentId, {
-        summary: newSummary
-      });
-      toast.success('Summary updated successfully!');
-      fetchContents(selectedKB.id);
-    } catch (error) {
-      console.error('Error updating summary:', error);
-      toast.error('Failed to update summary');
-    }
-  };
+
 
   const viewContent = async (content) => {
     try {
@@ -516,47 +439,59 @@ const KnowledgeBase = () => {
 
       {/* Provider/Model Selection */}
       <div className="p-4 border-b border-slate-700/50 bg-slate-900">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <Cog6ToothIcon className="h-4 w-4 text-slate-400" />
-            <span className="text-sm text-slate-400">Processing Model:</span>
-          </div>
-          
-          <select
-            value={selectedProvider?.id || ''}
-            onChange={(e) => {
-              const provider = providers.find(p => p.id === parseInt(e.target.value));
-              setSelectedProvider(provider);
-              setSelectedModel(null);
-            }}
-            className="px-3 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm focus:border-blue-500"
-          >
-            <option value="">Select Provider</option>
-            {providers.map(provider => (
-              <option key={provider.id} value={provider.id}>
-                {provider.name}
-              </option>
-            ))}
-          </select>
-          
-          <select
-            value={selectedModel?.id || ''}
-            onChange={(e) => {
-              const model = models.find(m => m.id === parseInt(e.target.value));
-              setSelectedModel(model);
-            }}
-            className="px-3 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm focus:border-blue-500"
-            disabled={!selectedProvider}
-          >
-            <option value="">Select Model</option>
-            {models
-              .filter(model => !selectedProvider || model.provider_id === selectedProvider.id)
-              .map(model => (
-                <option key={model.id} value={model.id}>
-                  {model.name}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Cog6ToothIcon className="h-4 w-4 text-slate-400" />
+              <span className="text-sm text-slate-400">Processing Model:</span>
+            </div>
+            
+            <select
+              value={selectedProvider?.id || ''}
+              onChange={(e) => {
+                const provider = providers.find(p => p.id === parseInt(e.target.value));
+                setSelectedProvider(provider);
+                setSelectedModel(null);
+              }}
+              className="px-3 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm focus:border-blue-500"
+            >
+              <option value="">Select Provider</option>
+              {providers.map(provider => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.name}
                 </option>
               ))}
-          </select>
+            </select>
+            
+            <select
+              value={selectedModel?.id || ''}
+              onChange={(e) => {
+                const model = models.find(m => m.id === parseInt(e.target.value));
+                setSelectedModel(model);
+              }}
+              className="px-3 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm focus:border-blue-500"
+              disabled={!selectedProvider}
+            >
+              <option value="">Select Model</option>
+              {models
+                .filter(model => !selectedProvider || model.provider_id === selectedProvider.id)
+                .map(model => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+          
+          {/* ChromaDB Status */}
+          <div className="flex items-center space-x-2">
+            <span className="text-xs text-green-400 bg-green-900/20 px-2 py-1 rounded">
+              ChromaDB Live
+            </span>
+            <span className="text-xs text-slate-400">
+              Real-time vector storage
+            </span>
+          </div>
         </div>
       </div>
 
@@ -840,103 +775,34 @@ const KnowledgeBase = () => {
               </p>
             </div>
 
-            {/* Summary Length Control */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">Summary Length</label>
-              
-              {/* Quick Preset Buttons */}
-              <div className="flex gap-2 mb-3">
-                <button
-                  onClick={() => setMaxSummaryTokens(1000)}
-                  className={`px-3 py-1 rounded text-xs transition-colors ${
-                    maxSummaryTokens === 1000 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
-                >
-                  Brief (1K)
-                </button>
-                <button
-                  onClick={() => setMaxSummaryTokens(2000)}
-                  className={`px-3 py-1 rounded text-xs transition-colors ${
-                    maxSummaryTokens === 2000 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
-                >
-                  Standard (2K)
-                </button>
-                <button
-                  onClick={() => setMaxSummaryTokens(5000)}
-                  className={`px-3 py-1 rounded text-xs transition-colors ${
-                    maxSummaryTokens === 5000 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
-                >
-                  Detailed (5K)
-                </button>
-                <button
-                  onClick={() => setMaxSummaryTokens(10000)}
-                  className={`px-3 py-1 rounded text-xs transition-colors ${
-                    maxSummaryTokens === 10000 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
-                >
-                  Comprehensive (10K)
-                </button>
-              </div>
-              
-              {/* Range Slider */}
-              <div className="flex items-center space-x-4">
+            {/* Unified Content Input Section */}
+            <div className="space-y-6 mb-6">
+              {/* Text Content */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Content Title (Optional)</label>
                 <input
-                  type="range"
-                  min="500"
-                  max="10000"
-                  step="500"
-                  value={maxSummaryTokens}
-                  onChange={(e) => setMaxSummaryTokens(parseInt(e.target.value))}
-                  className="flex-1"
+                  type="text"
+                  value={textTitle}
+                  onChange={(e) => setTextTitle(e.target.value)}
+                  placeholder="Enter a title for this content"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                 />
-                <span className="text-sm text-slate-400 min-w-[100px] font-mono">
-                  {maxSummaryTokens.toLocaleString()} tokens
-                </span>
               </div>
               
-              <p className="text-xs text-slate-400 mt-2">
-                Higher token counts generate more comprehensive summaries with greater detail and context preservation.
-                <br />
-                <span className="text-yellow-400">⚠️ Very high token counts may be slower and more expensive to process.</span>
-              </p>
-            </div>
-
-            {/* Content Type Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">Content Type</label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowTextInput(false)}
-                  className={`px-3 py-2 rounded-lg text-sm transition-colors ${
-                    !showTextInput ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-750'
-                  }`}
-                >
-                  Files & Images
-                </button>
-                <button
-                  onClick={() => setShowTextInput(true)}
-                  className={`px-3 py-2 rounded-lg text-sm transition-colors ${
-                    showTextInput ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-750'
-                  }`}
-                >
-                  Text Only
-                </button>
+              <div>
+                <label className="block text-sm font-medium mb-2">Text Content</label>
+                <textarea
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  placeholder="Enter your text content here..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                  rows={6}
+                />
               </div>
-            </div>
 
-            {/* File Upload Section */}
-            {!showTextInput && (
-              <div className="space-y-4 mb-6">
+              {/* File Upload Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Document Upload */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Upload Documents</label>
                   <div className="border-2 border-dashed border-slate-600 rounded-lg p-4 text-center">
@@ -959,6 +825,7 @@ const KnowledgeBase = () => {
                   </div>
                 </div>
 
+                {/* Image Upload */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Upload Images</label>
                   <div className="border-2 border-dashed border-slate-600 rounded-lg p-4 text-center">
@@ -981,117 +848,89 @@ const KnowledgeBase = () => {
                   </div>
                 </div>
               </div>
-            )}
-
-            {/* Text Input Section */}
-            {showTextInput && (
-              <div className="space-y-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Content Title (Optional)</label>
-                  <input
-                    type="text"
-                    value={textTitle}
-                    onChange={(e) => setTextTitle(e.target.value)}
-                    placeholder="Enter a title for this content"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Text Content</label>
-                  <textarea
-                    value={textInput}
-                    onChange={(e) => setTextInput(e.target.value)}
-                    placeholder="Enter your text content here..."
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                    rows={8}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Uploaded Files Preview */}
-            {(uploadedFiles.length > 0 || uploadedImages.length > 0) && (
-              <div className="space-y-4 mb-6">
-                {uploadedFiles.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium mb-2">Documents ({uploadedFiles.length})</h4>
-                    <div className="space-y-2">
-                      {uploadedFiles.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between bg-slate-800 rounded p-2">
-                          <span className="text-sm text-white">{file.name}</span>
-                          <button
-                            onClick={() => removeFile(index, 'files')}
-                            className="text-red-400 hover:text-red-300"
-                          >
-                            <XMarkIcon className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {uploadedImages.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium mb-2">Images ({uploadedImages.length})</h4>
-                    <div className="space-y-2">
-                      {uploadedImages.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between bg-slate-800 rounded p-2">
-                          <span className="text-sm text-white">{file.name}</span>
-                          <button
-                            onClick={() => removeFile(index, 'images')}
-                            className="text-red-400 hover:text-red-300"
-                          >
-                            <XMarkIcon className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowFileUpload(false);
-                  setShowTextInput(false);
-                  setUploadedFiles([]);
-                  setUploadedImages([]);
-                  setTextInput('');
-                  setTextTitle('');
-                  setUserPrompt('');
-                }}
-                className="flex-1 bg-slate-800 hover:bg-slate-750 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={extractAndSummarize}
-                disabled={!selectedProvider || !selectedModel || 
-                  (uploadedFiles.length === 0 && uploadedImages.length === 0 && !textInput.trim()) || processing}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
-              >
-                {processing ? (
-                  <>
-                    <ArrowPathIcon className="h-4 w-4 animate-spin" />
-                    {processingStep}
-                  </>
-                ) : (
-                  <>
-                    <PlayIcon className="h-4 w-4" />
-                    Extract & Summarize
-                  </>
-                )}
-              </button>
             </div>
-          </div>
-        </div>
-      )}
 
+                  {/* Uploaded Files Preview */}
+                  {(uploadedFiles.length > 0 || uploadedImages.length > 0) && (
+                    <div className="space-y-4 mb-6">
+                      {uploadedFiles.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-2">Documents ({uploadedFiles.length})</h4>
+                          <div className="space-y-2">
+                            {uploadedFiles.map((file, index) => (
+                              <div key={index} className="flex items-center justify-between bg-slate-800 rounded p-2">
+                                <span className="text-sm text-white">{file.name}</span>
+                                <button
+                                  onClick={() => removeFile(index, 'files')}
+                                  className="text-red-400 hover:text-red-300"
+                                >
+                                  <XMarkIcon className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {uploadedImages.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-2">Images ({uploadedImages.length})</h4>
+                          <div className="space-y-2">
+                            {uploadedImages.map((file, index) => (
+                              <div key={index} className="flex items-center justify-between bg-slate-800 rounded p-2">
+                                <span className="text-sm text-white">{file.name}</span>
+                                <button
+                                  onClick={() => removeFile(index, 'images')}
+                                  className="text-red-400 hover:text-red-300"
+                                >
+                                  <XMarkIcon className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setShowFileUpload(false);
+                        setUploadedFiles([]);
+                        setUploadedImages([]);
+                        setTextInput('');
+                        setTextTitle('');
+                        setUserPrompt('');
+                      }}
+                      className="flex-1 bg-slate-800 hover:bg-slate-750 text-white px-4 py-2 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={extractAndSummarize}
+                      disabled={!selectedProvider || !selectedModel || 
+                        (uploadedFiles.length === 0 && uploadedImages.length === 0 && !textInput.trim()) || processing}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      {processing ? (
+                        <>
+                          <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                          {processingStep}
+                        </>
+                      ) : (
+                        <>
+                          <PlayIcon className="h-4 w-4" />
+                          Extract & Summarize
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+      
       {/* Review Modal */}
       {showReview && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -1107,32 +946,60 @@ const KnowledgeBase = () => {
             </div>
 
             <div className="space-y-4 mb-6">
-              {extractedTexts.map((text, index) => (
-                <div key={index} className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-                  <h4 className="text-sm font-medium mb-2">
-                    {uploadedFiles[index]?.name || uploadedImages[index]?.name || (textInput.trim() ? (textTitle || 'Custom Text') : 'Content')}
-                  </h4>
-                  
-                  <div className="mb-3">
-                    <h5 className="text-xs font-medium text-slate-400 mb-1">Extracted Text:</h5>
-                    <div className="bg-slate-900 rounded p-3 text-sm text-slate-300 max-h-32 overflow-y-auto">
-                      {text.substring(0, 500)}
-                      {text.length > 500 && '...'}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h5 className="text-xs font-medium text-slate-400 mb-1">Generated Summary:</h5>
-                    <textarea
-                      value={editedSummaries[index] !== undefined ? editedSummaries[index] : summaries[index]}
-                      onChange={(e) => setEditedSummaries(prev => ({ ...prev, [index]: e.target.value }))}
-                      className="w-full bg-slate-900 rounded p-3 text-sm text-slate-300 border border-slate-700 focus:border-blue-500 focus:outline-none"
-                      rows={4}
-                      placeholder="Edit the summary if needed..."
-                    />
-                  </div>
+              {/* Unified Summary Section */}
+              <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                <h4 className="text-sm font-medium mb-2 text-white">Content Summary</h4>
+                <p className="text-xs text-slate-400 mb-3">
+                  {uploadedFiles.length > 0 && `${uploadedFiles.length} document${uploadedFiles.length !== 1 ? 's' : ''}`}
+                  {uploadedFiles.length > 0 && uploadedImages.length > 0 && ' and '}
+                  {uploadedImages.length > 0 && `${uploadedImages.length} image${uploadedImages.length !== 1 ? 's' : ''}`}
+                  {textInput.trim() && (uploadedFiles.length > 0 || uploadedImages.length > 0) && ' and '}
+                  {textInput.trim() && 'custom text'}
+                  {' processed together'}
+                </p>
+                
+                <div className="mb-3">
+                  <h5 className="text-xs font-medium text-slate-400 mb-1">Generated Summary:</h5>
+                  <textarea
+                    value={editedSummaries[0] !== undefined ? editedSummaries[0] : summaries[0] || ''}
+                    onChange={(e) => setEditedSummaries(prev => ({ ...prev, 0: e.target.value }))}
+                    className="w-full bg-slate-900 rounded p-3 text-sm text-slate-300 border border-slate-700 focus:border-blue-500 focus:outline-none"
+                    rows={6}
+                    placeholder="Edit the summary if needed..."
+                  />
                 </div>
-              ))}
+              </div>
+
+              {/* Content List Section */}
+              <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                <h4 className="text-sm font-medium mb-3 text-white">Content Items</h4>
+                <p className="text-xs text-slate-400 mb-3">
+                  Note: Files and images will be processed by the LLM to generate the summary, but will not be saved to disk.
+                </p>
+                <div className="space-y-2">
+                  {uploadedFiles.map((file, index) => (
+                    <div key={`file-${index}`} className="flex items-center space-x-2 text-sm text-slate-300">
+                      <DocumentIcon className="h-4 w-4 text-blue-400" />
+                      <span>{file.name}</span>
+                      <span className="text-slate-500">(Document - Processed only)</span>
+                    </div>
+                  ))}
+                  {uploadedImages.map((image, index) => (
+                    <div key={`image-${index}`} className="flex items-center space-x-2 text-sm text-slate-300">
+                      <PhotoIcon className="h-4 w-4 text-green-400" />
+                      <span>{image.name}</span>
+                      <span className="text-slate-500">(Image - Processed only)</span>
+                    </div>
+                  ))}
+                  {textInput.trim() && (
+                    <div className="flex items-center space-x-3 text-sm text-slate-300">
+                      <DocumentDuplicateIcon className="h-4 w-4 text-purple-400" />
+                      <span>{textTitle || 'Custom Text'}</span>
+                      <span className="text-slate-500">(Text - Saved)</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-3">
@@ -1163,7 +1030,6 @@ const KnowledgeBase = () => {
           </div>
         </div>
       )}
-
       {/* Create Knowledge Base Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -1257,6 +1123,59 @@ const KnowledgeBase = () => {
                       <p className="text-slate-300 leading-relaxed">
                         {contentDetails.summary}
                       </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Unified Content Details Section */}
+                {selectedContent.content_type === 'unified' && contentDetails.content_metadata && (
+                  <div>
+                    <h4 className="text-md font-medium text-slate-200 mb-2">Content Items</h4>
+                    <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                      {contentDetails.content_metadata.note && (
+                        <div className="mb-3 p-2 bg-slate-700 rounded text-xs text-slate-300">
+                          ℹ️ {contentDetails.content_metadata.note}
+                        </div>
+                      )}
+                      {contentDetails.content_metadata.files && contentDetails.content_metadata.files.length > 0 && (
+                        <div className="mb-4">
+                          <h5 className="text-sm font-medium text-slate-300 mb-2">Files & Images:</h5>
+                          <div className="space-y-2">
+                            {contentDetails.content_metadata.files.map((file, index) => (
+                              <div key={index} className="flex items-center justify-between bg-slate-700 rounded p-2">
+                                <div className="flex items-center space-x-2">
+                                  {file.mime_type.startsWith('image/') ? (
+                                    <PhotoIcon className="h-4 w-4 text-green-400" />
+                                  ) : (
+                                    <DocumentIcon className="h-4 w-4 text-blue-400" />
+                                  )}
+                                  <span className="text-sm text-slate-300">{file.original_name}</span>
+                                  <span className="text-xs text-slate-500">({file.type})</span>
+                                </div>
+                                <span className="text-xs text-slate-500">
+                                  {file.saved_path ? `${(file.size / 1024).toFixed(1)} KB` : "Not saved"}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {contentDetails.content_metadata.text_content && (
+                        <div>
+                          <h5 className="text-sm font-medium text-slate-300 mb-2">Text Content:</h5>
+                          <div className="bg-slate-700 rounded p-2">
+                            <div className="text-sm text-slate-300">
+                              <strong>Title:</strong> {contentDetails.content_metadata.text_content.title || 'Untitled'}
+                            </div>
+                            {contentDetails.content_metadata.text_content.description && (
+                              <div className="text-sm text-slate-400 mt-1">
+                                {contentDetails.content_metadata.text_content.description}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
