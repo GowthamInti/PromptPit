@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration - CHANGE THESE TO YOUR DOCKER HUB USERNAME
-DOCKER_USERNAME="28101995"
+DOCKER_USERNAME="your-dockerhub-username"
 VERSION="latest"
 
 echo "🔨 Building and pushing Docker images to Docker Hub..."

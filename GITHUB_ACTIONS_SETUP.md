@@ -28,17 +28,13 @@ You need to add these secrets to your GitHub repository:
 
 ## 📁 Workflow Files
 
-I've created two workflow files for you:
+I've created one workflow file for you:
 
-### 1. **`docker-simple.yml`** (Recommended for beginners)
+### **`docker-simple.yml`** (Simple and effective)
 - Builds and pushes `:latest` tags
 - Triggers on push to main branch
 - Simple and straightforward
-
-### 2. **`docker-advanced.yml`**
-- Creates multiple tags (branch names, commit SHAs, versions)
-- Updates docker-compose files automatically
-- More complex but more flexible
+- Perfect for getting started
 
 ## 🎯 How It Works
 
@@ -46,14 +42,7 @@ I've created two workflow files for you:
 1. **Trigger**: Push to main branch or manual trigger
 2. **Build**: Creates Docker images from your code
 3. **Push**: Uploads images to Docker Hub with `:latest` tag
-4. **Result**: Users can pull `28101995/llm-eval-backend:latest`
-
-### **Advanced Workflow:**
-1. **Trigger**: Push to main branch, tags, or manual trigger
-2. **Build**: Creates Docker images from your code
-3. **Push**: Uploads images with multiple tags
-4. **Update**: Automatically updates docker-compose files
-5. **Commit**: Pushes updated files back to repository
+4. **Result**: Users can pull `your-username/llm-eval-backend:latest`
 
 ## 🚀 Usage
 
