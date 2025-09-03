@@ -1,14 +1,20 @@
 # Build stage
 FROM node:18-alpine AS build
 
+# Install additional build tools if needed
+RUN apk add --no-cache python3 make g++
+
 # Set working directory
 WORKDIR /app
 
 # Copy package files first for better caching
 COPY package*.json ./
 
+# Debug: Show what files we have
+RUN ls -la
+
 # Install ALL dependencies (including dev dependencies needed for build)
-RUN npm ci --silent
+RUN npm install --verbose
 
 # Copy source code
 COPY . .
