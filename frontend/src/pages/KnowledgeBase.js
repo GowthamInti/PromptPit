@@ -53,7 +53,6 @@ const KnowledgeBase = () => {
   const [textTitle, setTextTitle] = useState('');
   
   // Processing states
-  const [extractedTexts, setExtractedTexts] = useState([]);
   const [summaries, setSummaries] = useState([]);
   const [showReview, setShowReview] = useState(false);
   const [processingStep, setProcessingStep] = useState('');
@@ -235,16 +234,8 @@ const KnowledgeBase = () => {
       // Split the response into individual summaries (assuming the LLM provides separate summaries)
       // For now, we'll use the full response for each content item
       const summaries = Array(allContent.length).fill(outputText);
-      const extractedTexts = contentNames.map((name, index) => {
-        if (allContent[index].type === 'text') {
-          return `Text: ${name} - ${allContent[index].content.substring(0, 100)}...`;
-        } else {
-          return `File: ${name} - Content extracted and processed`;
-        }
-      });
       
       setSummaries(summaries);
-      setExtractedTexts(extractedTexts);
       setShowReview(true);
       setProcessingStep('');
       
@@ -286,7 +277,6 @@ const KnowledgeBase = () => {
       setUserPrompt('');
       setSummaries([]);
       setEditedSummaries({});
-      setExtractedTexts([]);
       setShowReview(false);
       setProcessingStep('');
       
@@ -336,7 +326,16 @@ const KnowledgeBase = () => {
       
       // Fetch full content details
       const response = await apiService.getKnowledgeBaseContent(content.knowledge_base_id, content.id);
-      setContentDetails(response.data);
+      console.log('Content API response:', response.data);
+      
+      // The backend returns content in response.data.content
+      if (response.data && response.data.content) {
+        setContentDetails(response.data.content);
+      } else {
+        console.error('Unexpected API response structure:', response.data);
+        toast.error('Invalid content data received');
+        setShowContentViewer(false);
+      }
     } catch (error) {
       console.error('Error fetching content details:', error);
       toast.error('Failed to load content details');

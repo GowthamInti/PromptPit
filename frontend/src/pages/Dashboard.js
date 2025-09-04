@@ -4,6 +4,7 @@ import {
   PlusIcon, 
   ArrowRightIcon,
   SparklesIcon,
+  FireIcon,
   TrashIcon,
   KeyIcon,
   EllipsisVerticalIcon,
@@ -46,10 +47,10 @@ const Dashboard = () => {
 
   const quickActions = [
     {
-      name: 'Create New Prompt',
+      name: 'Forge a New Prompt',
       description: 'Start experimenting with a new prompt',
       href: '/editor',
-      icon: SparklesIcon,
+      icon: FireIcon,
       color: 'bg-blue-500',
       iconColor: 'text-blue-400',
     },
@@ -146,7 +147,7 @@ const Dashboard = () => {
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                <SparklesIcon className="h-8 w-8 text-blue-400" />
+                <FireIcon className="h-8 w-8 text-blue-400" />
               </div>
             </div>
             <div className="ml-4">
