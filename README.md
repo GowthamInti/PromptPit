@@ -2,6 +2,10 @@
 
 **AI Prompt Engineering & Testing Platform**
 
+<div align="center">
+  <img src="frontend/docs/images/forge.png" alt="PromptPit Interface" width="800" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+</div>
+
 PromptPit is a powerful, self-hosted platform designed for AI researchers, developers, and prompt engineers to experiment, test, and optimize prompts across multiple Large Language Model (LLM) providers. Built with a gritty, battle-themed interface, PromptPit transforms prompt engineering into an engaging experience.
 
 ## ⚡ Key Features
@@ -12,6 +16,8 @@ PromptPit is a powerful, self-hosted platform designed for AI researchers, devel
 
 
 ### 🔥 **Forge - Advanced Prompt Engineering**
+![Forge Interface](frontend/docs/images/forge.png)
+
 - **Rich Text Editor**: Create and edit prompts with syntax highlighting
 - **System Prompts**: Define AI behavior and context
 - **Version Control**: Lock and track different prompt versions
@@ -27,6 +33,8 @@ PromptPit is a powerful, self-hosted platform designed for AI researchers, devel
 - **Provider Switching**: Test different models in the same conversation
 
 ### 📦 **Stash - Knowledge Base Management**
+![Stash Interface](frontend/docs/images/stash.png)
+
 - **Document Storage**: Upload and manage knowledge documents
 - **RAG Integration**: Retrieve Augmented Generation for enhanced prompts
 - **Vector Search**: Powered by ChromaDB for semantic similarity search
@@ -35,6 +43,8 @@ PromptPit is a powerful, self-hosted platform designed for AI researchers, devel
 - **Context Enhancement**: Automatically enrich prompts with relevant context
 
 ### ⚙️ **Gears - Dashboard & Configuration**
+![Gears Dashboard](frontend/docs/images/Gears.png)
+
 - **Provider Status**: Monitor API key validity and model availability
 - **Usage Statistics**: Track prompt executions and performance
 - **Quick Actions**: Fast access to all platform features
@@ -68,6 +78,10 @@ PromptPit is a powerful, self-hosted platform designed for AI researchers, devel
 - Enhanced prompt responses with external knowledge
 
 ## 🎨 User Experience
+
+<div align="center">
+  <img src="frontend/docs/images/stash.png" alt="PromptPit User Interface" width="700" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+</div>
 
 ### **Modern Interface**
 - **Dark Theme**: Easy on the eyes for extended use
@@ -129,6 +143,10 @@ PromptPit is a powerful, self-hosted platform designed for AI researchers, devel
 - Develop AI literacy and skills
 
 ## 🏗️ Architecture
+
+<div align="center">
+  <img src="frontend/docs/images/Gears.png" alt="PromptPit Architecture" width="600" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+</div>
 
 ### **Frontend (React)**
 - Modern React 18 with hooks
