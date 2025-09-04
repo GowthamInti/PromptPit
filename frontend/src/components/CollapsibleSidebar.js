@@ -1,22 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
-  HomeIcon, 
-  PencilIcon, 
-  DocumentIcon,
+  CogIcon, 
+  FireIcon, 
+  ArchiveBoxIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   MapPinIcon,
   Bars3Icon,
   XMarkIcon,
-  ChatBubbleLeftRightIcon
+  ShieldExclamationIcon
 } from '@heroicons/react/24/outline';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: HomeIcon },
-  { name: 'Prompt Engineering', href: '/editor', icon: PencilIcon },
-  { name: 'Chat', href: '/chat', icon: ChatBubbleLeftRightIcon },
-  { name: 'Knowledge Base', href: '/knowledge-base', icon: DocumentIcon },
+  { name: 'Gears', href: '/', icon: CogIcon },
+  { name: 'Forge', href: '/editor', icon: FireIcon },
+  { name: 'Arena', href: '/chat', icon: ShieldExclamationIcon },
+  { name: 'Stash', href: '/knowledge-base', icon: ArchiveBoxIcon },
 ];
 
 const CollapsibleSidebar = ({ children }) => {
@@ -50,17 +50,17 @@ const CollapsibleSidebar = ({ children }) => {
 
   const shouldExpand = isPinned || isHovered;
   const isCollapsedState = isCollapsed && !shouldExpand;
-  const sidebarWidth = isCollapsedState ? 'w-16' : 'w-64';
-  const contentMargin = isCollapsedState ? 'ml-16' : 'ml-64';
+  const sidebarWidth = isCollapsedState ? 'w-16' : 'w-56';
+  const contentMargin = isCollapsedState ? 'ml-16' : 'ml-56';
 
   return (
     <div className="min-h-screen bg-black flex">
       {/* Mobile sidebar overlay */}
       <div className={`fixed inset-0 z-50 lg:hidden ${mobileSidebarOpen ? 'block' : 'hidden'}`}>
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setMobileSidebarOpen(false)} />
-        <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-slate-900 border-r border-slate-800">
+        <div className="fixed inset-y-0 left-0 flex w-56 flex-col bg-slate-900 border-r border-slate-800">
           <div className="flex h-16 items-center justify-between px-4">
-            <h1 className="text-xl font-bold text-white">🎯 Playground</h1>
+            <h1 className="text-xl font-bold text-white">🔨 PromptPit</h1>
             <button
               onClick={() => setMobileSidebarOpen(false)}
               className="text-slate-400 hover:text-white transition-colors"
@@ -97,11 +97,11 @@ const CollapsibleSidebar = ({ children }) => {
         <div className="flex h-16 items-center justify-between px-4 border-b border-slate-800">
           {shouldExpand ? (
             <h1 className="text-xl font-bold text-white transition-opacity duration-300">
-              🎯 Playground
+              🔨 PromptPit
             </h1>
           ) : (
             <div className="w-8 h-8 flex items-center justify-center">
-              <span className="text-xl">🎯</span>
+              <span className="text-xl">🔨</span>
             </div>
           )}
           

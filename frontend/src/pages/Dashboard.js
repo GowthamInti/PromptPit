@@ -8,8 +8,8 @@ import {
   KeyIcon,
   EllipsisVerticalIcon,
   EyeSlashIcon,
-  ChatBubbleLeftRightIcon,
-  DocumentIcon
+  ShieldExclamationIcon,
+  ArchiveBoxIcon
 } from '@heroicons/react/24/outline';
 import { useProviders } from '../contexts/ProviderContext';
 import AddProviderModal from '../components/AddProviderModal';
@@ -54,18 +54,18 @@ const Dashboard = () => {
       iconColor: 'text-blue-400',
     },
     {
-      name: 'Chat with AI',
+      name: 'Arena',
       description: 'Start a conversation with memory',
       href: '/chat',
-      icon: ChatBubbleLeftRightIcon,
+      icon: ShieldExclamationIcon,
       color: 'bg-green-500',
       iconColor: 'text-green-400',
     },
     {
-      name: 'Knowledge Base',
+      name: 'Stash',
       description: 'Manage and search your documents',
       href: '/knowledge-base',
-      icon: DocumentIcon,
+      icon: ArchiveBoxIcon,
       color: 'bg-purple-500',
       iconColor: 'text-purple-400',
     },
@@ -124,9 +124,9 @@ const Dashboard = () => {
       {/* Header */}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="heading-xl text-gradient mb-2">Dashboard</h1>
+          <h1 className="heading-xl text-gradient mb-2">Gears</h1>
           <p className="body-lg text-secondary max-w-2xl">
-            Welcome to your Prompt Optimization Playground. Configure your LLM providers and start experimenting.
+            Welcome to your PromptPit. Configure your LLM providers and start experimenting.
           </p>
         </div>
         <div className="mt-4 sm:mt-0">

@@ -153,8 +153,8 @@ const PromptEditor = () => {
       setOutput(currentPrompt.last_output || null);
       setIsEditing(false);
       
-      // Load versions for this prompt
-      if (currentPrompt.id) {
+      // Load versions for this prompt (only if it's a valid integer ID)
+      if (currentPrompt.id && !isNaN(parseInt(currentPrompt.id))) {
         fetchPromptVersions(currentPrompt.id);
         // Show versions panel if the prompt has versions
         if (currentPrompt.versions_count > 0) {
@@ -452,19 +452,28 @@ const PromptEditor = () => {
       };
 
       let result;
+      let actualPromptId;
       
       // If this is a new prompt, create and lock in one operation
       if (isNewPrompt) {
         result = await createAndLockPrompt(versionData);
-        setCurrentPrompt({ id: result.prompt_id, ...promptData });
+        actualPromptId = result.prompt_id;
+        setCurrentPrompt({ id: actualPromptId, ...promptData });
         setIsNewPrompt(false);
       } else {
         // For existing prompts, just lock the version
         result = await lockPromptVersion(currentPrompt.id, versionData);
+        actualPromptId = currentPrompt.id;
       }
       
-      await fetchPromptVersions(result.prompt_id || currentPrompt.id);
-      setShowVersions(true);
+      // Only fetch versions if we have a valid integer prompt ID
+      if (actualPromptId && !isNaN(parseInt(actualPromptId))) {
+        await fetchPromptVersions(actualPromptId);
+        setShowVersions(true);
+      } else {
+        console.warn('Cannot fetch versions: Invalid prompt ID:', actualPromptId);
+        toast.error('Failed to load prompt versions');
+      }
       
     } catch (error) {
       console.error('Error locking version:', error);
@@ -699,7 +708,13 @@ const PromptEditor = () => {
   };
 
   const handleDeleteVersion = async (versionId) => {
-    if (!currentPrompt) return;
+    if (!currentPrompt || !currentPrompt.id) return;
+    
+    // Ensure we have a valid integer prompt ID
+    if (isNaN(parseInt(currentPrompt.id))) {
+      toast.error('Cannot delete version: Invalid prompt ID');
+      return;
+    }
     
     if (window.confirm('Are you sure you want to delete this version? This action cannot be undone.')) {
       try {
@@ -707,6 +722,7 @@ const PromptEditor = () => {
         toast.success('Version deleted successfully!');
       } catch (error) {
         console.error('Error deleting version:', error);
+        toast.error('Failed to delete version');
       }
     }
   };
@@ -827,7 +843,7 @@ const PromptEditor = () => {
                   <div>
                     <label className="block text-sm font-medium text-blue-300 mb-2">
                       <BookOpenIcon className="h-4 w-4 inline mr-1" />
-                      🧠 Knowledge Base (RAG) - Optional {Array.isArray(knowledgeBases) && knowledgeBases.length > 0 && `(${knowledgeBases.length} available)`}
+                      🧠 Stash (RAG) - Optional {Array.isArray(knowledgeBases) && knowledgeBases.length > 0 && `(${knowledgeBases.length} available)`}
                     </label>
                     <select
                       value={selectedKnowledgeBase?.id || ''}
@@ -841,7 +857,7 @@ const PromptEditor = () => {
                       }}
                       className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="">No Knowledge Base</option>
+                      <option value="">No Stash</option>
                       {Array.isArray(knowledgeBases) && knowledgeBases.map((kb) => (
                         <option key={kb.id} value={kb.id}>
                           {kb.name} ({kb.content_count || 0} docs)
@@ -851,7 +867,7 @@ const PromptEditor = () => {
                     {selectedKnowledgeBase && (
                       <div className="mt-2 text-xs text-blue-300">
                         ✓ Selected: <span className="font-medium">{selectedKnowledgeBase.name}</span> • {selectedKnowledgeBase.content_count || 0} documents
-                        <span className="ml-2 text-slate-400">Your prompt will be enhanced with relevant context from this knowledge base.</span>
+                        <span className="ml-2 text-slate-400">Your prompt will be enhanced with relevant context from this stash.</span>
                       </div>
                     )}
                   </div>

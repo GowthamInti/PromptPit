@@ -396,7 +396,7 @@ const KnowledgeBase = () => {
         <div className="p-6 border-b border-slate-700/50 bg-slate-900">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold text-white">Knowledge Base</h1>
+              <h1 className="text-xl font-bold text-white">Stash</h1>
               <p className="text-sm text-slate-400">Create and manage document collections with vector search.</p>
             </div>
           </div>
@@ -424,7 +424,7 @@ const KnowledgeBase = () => {
       <div className="p-6 border-b border-slate-700/50 bg-slate-900">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-white">Knowledge Base</h1>
+            <h1 className="text-xl font-bold text-white">Stash</h1>
             <p className="text-sm text-slate-400">Create and manage document collections with vector search.</p>
           </div>
           <button
@@ -432,7 +432,7 @@ const KnowledgeBase = () => {
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors inline-flex items-center"
           >
             <PlusIcon className="mr-2 h-4 w-4" />
-            New Knowledge Base
+            New Stash
           </button>
         </div>
       </div>
@@ -503,7 +503,7 @@ const KnowledgeBase = () => {
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search knowledge bases..."
+                placeholder="Search stash..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500"
@@ -541,11 +541,11 @@ const KnowledgeBase = () => {
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <FolderIcon className="mx-auto h-12 w-12 text-slate-600" />
-              <h3 className="mt-2 text-sm font-medium text-slate-400">No knowledge bases found</h3>
+              <h3 className="mt-2 text-sm font-medium text-slate-400">No stash found</h3>
               <p className="mt-1 text-sm text-slate-500">
                 {searchTerm || filterType 
                   ? 'Try adjusting your search or filters.' 
-                  : 'Create your first knowledge base to get started.'}
+                  : 'Create your first stash to get started.'}
               </p>
               {!searchTerm && !filterType && (
                 <div className="mt-6">
@@ -554,7 +554,7 @@ const KnowledgeBase = () => {
                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors inline-flex items-center"
                   >
                     <PlusIcon className="mr-2 h-4 w-4" />
-                    Create First Knowledge Base
+                    Create First Stash
                   </button>
                 </div>
               )}
@@ -582,7 +582,7 @@ const KnowledgeBase = () => {
                           )}
                         </button>
                         <h3 className="text-lg font-semibold text-white">
-                          {kb.name || 'Untitled Knowledge Base'}
+                          {kb.name || 'Untitled Stash'}
                         </h3>
                         {kb.content_count > 0 && (
                           <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
@@ -627,14 +627,14 @@ const KnowledgeBase = () => {
                           }
                         }}
                         className="p-2 text-slate-400 hover:text-blue-400 transition-colors"
-                        title="View knowledge base contents"
+                        title="View stash contents"
                       >
                         <EyeIcon className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => deleteKnowledgeBase(kb.id)}
                         className="p-2 text-slate-400 hover:text-red-400 transition-colors"
-                        title="Delete knowledge base"
+                        title="Delete stash"
                       >
                         <TrashIcon className="h-4 w-4" />
                       </button>
@@ -664,7 +664,7 @@ const KnowledgeBase = () => {
                         <div className="text-center py-8 text-slate-400">
                           <DocumentIcon className="h-16 w-16 mx-auto mb-4 opacity-50" />
                           <p className="text-lg mb-2">No documents uploaded yet</p>
-                          <p className="text-sm mb-4">Upload files to start building your knowledge base</p>
+                          <p className="text-sm mb-4">Upload files to start building your stash</p>
                           <button
                             onClick={() => {
                               setSelectedKB(kb);
@@ -1022,7 +1022,7 @@ const KnowledgeBase = () => {
                 ) : (
                   <>
                     <CheckCircleIcon className="h-4 w-4" />
-                    Add to Knowledge Base
+                    Add to Stash
                   </>
                 )}
               </button>
@@ -1034,7 +1034,7 @@ const KnowledgeBase = () => {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-slate-900 rounded-lg border border-slate-800 p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Create Knowledge Base</h3>
+            <h3 className="text-lg font-semibold mb-4">Create Stash</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Name</label>
@@ -1043,7 +1043,7 @@ const KnowledgeBase = () => {
                   value={newKB.name}
                   onChange={(e) => setNewKB({ ...newKB, name: e.target.value })}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                  placeholder="Enter knowledge base name"
+                  placeholder="Enter stash name"
                 />
               </div>
               <div>

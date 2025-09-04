@@ -167,9 +167,9 @@ const ChatPage = () => {
     }
   };
 
-  // Clear chat
+  // Clear arena
   const clearChat = async () => {
-    if (window.confirm('Are you sure you want to clear the chat? This action cannot be undone.')) {
+    if (window.confirm('Are you sure you want to clear the arena? This action cannot be undone.')) {
       try {
         if (activeSessionId) {
           await clearConversation(activeSessionId);
@@ -178,7 +178,7 @@ const ChatPage = () => {
         setUploadedImages([]);
       } catch (error) {
         console.error('Error clearing chat:', error);
-        toast.error('Failed to clear chat');
+        toast.error('Failed to clear arena');
       }
     }
   };
@@ -202,38 +202,39 @@ const ChatPage = () => {
     <div className="h-full w-full flex flex-col bg-slate-900">
       {/* Header with Provider/Model Selection */}
       <div className="bg-slate-800 border-b border-slate-700 p-4">
+        {/* Top Row - Title and Back Button */}
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-white">💬 Chat</h1>
+          <h1 className="text-2xl font-bold text-white">⚔️ Arena</h1>
           <button
             onClick={() => navigate('/')}
-            className="flex items-center text-slate-300 hover:text-white transition-colors"
+            className="flex items-center text-slate-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-700"
           >
             <ArrowLeftIcon className="h-5 w-5 mr-2" />
-            Back to Dashboard
+            Back to Gears
           </button>
         </div>
 
-                {/* Provider and Model Selection */}
-        <div className="flex items-center justify-between">
+        {/* Bottom Row - Provider/Model Selection and Clear Button */}
+        <div className="flex items-center justify-between gap-4">
           {/* Provider/Model Capsule */}
-          <div className="flex items-center space-x-4">
+          <div className="flex-1 min-w-0">
             <button
               onClick={() => setShowModelConfig(!showModelConfig)}
-              className="bg-slate-700 hover:bg-slate-600 rounded-full px-4 py-2 flex items-center space-x-2 transition-colors"
+              className="bg-slate-700 hover:bg-slate-600 rounded-full px-4 py-2 flex items-center space-x-2 transition-colors w-full max-w-md"
             >
-              <span className="text-sm text-white">
+              <span className="text-sm text-white truncate">
                 {selectedProvider?.name || 'No Provider'} / {selectedModel?.name || 'No Model'}
               </span>
             </button>
           </div>
 
-          {/* Clear Chat Button */}
+          {/* Clear Arena Button */}
           <button
             onClick={clearChat}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center"
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center whitespace-nowrap"
           >
             <XMarkIcon className="h-4 w-4 mr-2" />
-            Clear Chat
+            Clear Arena
           </button>
         </div>
 
@@ -289,7 +290,7 @@ const ChatPage = () => {
         )}
       </div>
 
-      {/* Chat Messages */}
+      {/* Arena Messages */}
       <div 
         className="flex-1 overflow-y-auto p-4 space-y-4"
         onDragOver={handleDragOver}
@@ -300,10 +301,10 @@ const ChatPage = () => {
           <div className="h-full flex items-center justify-center">
             <div className="text-center text-slate-400">
               <div className="w-16 h-16 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">💬</span>
+                <span className="text-2xl">⚔️</span>
               </div>
-              <h2 className="text-xl font-semibold mb-2">Start a Conversation</h2>
-              <p>Conversational bot with current session memory</p>
+              <h2 className="text-xl font-semibold mb-2">Enter the Arena</h2>
+              <p>Battle with AI models using your prompts and strategies</p>
             </div>
           </div>
                   ) : (
@@ -316,7 +317,7 @@ const ChatPage = () => {
                 }`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium">
-                      {message.role === 'user' ? 'You' : 'Assistant'}
+                      {message.role === 'user' ? '⚔️ Warrior' : '🤖 AI Challenger'}
                     </span>
                     <span className="text-xs opacity-70">
                       {new Date(message.timestamp).toLocaleTimeString()}
@@ -448,7 +449,7 @@ const ChatPage = () => {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Type your message here... (Press Enter to send, Shift+Enter for new line)"
+              placeholder="Enter your battle strategy... (Press Enter to attack, Shift+Enter for new line)"
               className={`w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all duration-200 ${
                 isDragOver ? 'border-blue-400 bg-slate-600 ring-2 ring-blue-400' : ''
               }`}
@@ -482,14 +483,14 @@ const ChatPage = () => {
             ) : (
               <PaperAirplaneIcon className="h-5 w-5 mr-2" />
             )}
-            Send
+            Attack
           </button>
         </div>
 
         {/* Help Text */}
         <div className="mt-2 text-xs text-slate-400">
           {!selectedProvider || !selectedModel ? (
-            <span className="text-yellow-400">⚠️ Please select a provider and model to start chatting</span>
+            <span className="text-yellow-400">⚠️ Please select a provider and model to start battling</span>
           ) : null}
         </div>
       </div>

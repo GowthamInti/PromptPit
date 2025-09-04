@@ -20,7 +20,7 @@ services:
 
   # Backend API
   backend:
-    image: your-dockerhub-username/llm-eval-backend:latest
+    image: 28101995/llm-eval-backend:latest
     container_name: llm_eval_backend
     environment:
       - DATABASE_URL=postgresql://llm_user:llm_password@postgres:5432/llm_eval
@@ -40,7 +40,7 @@ services:
 
   # Frontend
   frontend:
-    image: your-dockerhub-username/llm-eval-frontend:latest
+    image: y28101995/llm-eval-frontend:latest
     container_name: llm_eval_frontend
     environment:
       - REACT_APP_API_URL=http://localhost:8000

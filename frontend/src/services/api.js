@@ -200,7 +200,7 @@ export const apiService = {
   getPromptOutputs: (promptId) => api.get(`/api/prompts/${promptId}/outputs`),
   getOutput: (outputId) => api.get(`/api/outputs/${outputId}`),
   
-  // Knowledge Base endpoints
+  // Stash endpoints
   getKnowledgeBases: () => api.get('/api/knowledge-bases'),
   createKnowledgeBase: (data) => api.post('/api/knowledge-bases', data),
   getKnowledgeBase: (kbId) => api.get(`/api/knowledge-bases/${kbId}`),
@@ -283,7 +283,7 @@ export const apiService = {
     
     // Ensure required parameters are present
     if (!data.summary) {
-      throw new Error('Summary is required for adding content to knowledge base');
+      throw new Error('Summary is required for adding content to stash');
     }
     
     // Add all the data with proper type conversion

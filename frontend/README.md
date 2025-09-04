@@ -1,6 +1,6 @@
-# 🎯 Prompt Optimization Playground Frontend
+# 🔨 PromptPit Frontend
 
-A modern React frontend for the Prompt Optimization Playground - a self-hosted tool for experimenting with prompts across multiple LLM providers.
+A modern React frontend for PromptPit - a self-hosted tool for experimenting with prompts across multiple LLM providers.
 
 ## 🚀 Features
 
@@ -196,7 +196,7 @@ To add support for new LLM providers:
 
 ## 📄 License
 
-This project is part of the Prompt Optimization Playground. See the main project license for details.
+This project is part of PromptPit. See the main project license for details.
 
 ## 🤝 Contributing
 

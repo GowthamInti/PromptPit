@@ -14,7 +14,7 @@ COPY package*.json ./
 RUN ls -la
 
 # Install ALL dependencies (including dev dependencies needed for build)
-RUN npm install --verbose
+RUN npm install 
 
 # Copy source code
 COPY . .

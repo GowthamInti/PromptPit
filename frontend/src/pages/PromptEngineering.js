@@ -175,7 +175,7 @@ const PromptEngineering = () => {
         <div className="p-6 border-b border-slate-700/50 bg-slate-900">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold text-white">Prompt Engineering</h1>
+              <h1 className="text-xl font-bold text-white">Forge</h1>
               <p className="text-sm text-slate-400">Create, manage, and version your prompts with full history tracking.</p>
             </div>
             <Link
@@ -210,7 +210,7 @@ const PromptEngineering = () => {
       <div className="p-6 border-b border-slate-700/50 bg-slate-900">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-white">Prompt Engineering</h1>
+            <h1 className="text-xl font-bold text-white">Forge</h1>
             <p className="text-sm text-slate-400">Create, manage, and version your prompts with full history tracking.</p>
           </div>
           <Link

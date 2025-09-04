@@ -8,7 +8,7 @@ Run the LLM Evaluation Playground with just a few Docker commands!
 
 1. **Download the docker-compose file:**
 ```bash
-wget https://raw.githubusercontent.com/your-username/your-repo/main/docker-compose.prod.yml
+wget https://raw.githubusercontent.com/GowthamInti/PromptPit/main/docker-compose.prod.yml
 ```
 
 2. **Start the application:**
@@ -24,7 +24,7 @@ docker-compose -f docker-compose.prod.yml up -d
 
 1. **Download the run script:**
 ```bash
-wget https://raw.githubusercontent.com/your-username/your-repo/main/run-app.sh
+wget https://raw.githubusercontent.com/GowthamInti/PromptPit/main/run-app.sh
 chmod +x run-app.sh
 ```
 
@@ -44,13 +44,11 @@ chmod +x run-app.sh
 
 You can customize the application by setting these environment variables:
 
-- `SECRET_KEY`: Change the default secret key for production
 - `POSTGRES_PASSWORD`: Change the database password
 - `CORS_ORIGINS`: Configure allowed origins
 
 ### Example with custom values:
 ```bash
-export SECRET_KEY="your-secure-secret-key"
 export POSTGRES_PASSWORD="your-secure-password"
 docker-compose -f docker-compose.prod.yml up -d
 ```
