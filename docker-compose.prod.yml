@@ -20,8 +20,8 @@ services:
 
   # Backend API
   backend:
-    image: 28101995/llm-eval-backend:latest
-    container_name: llm_eval_backend
+    image: 28101995/promptpit-backend:latest
+    container_name: promptpit-backend
     environment:
       - DATABASE_URL=postgresql://llm_user:llm_password@postgres:5432/llm_eval
       - SECRET_KEY=change-this-in-production
@@ -40,8 +40,8 @@ services:
 
   # Frontend
   frontend:
-    image: y28101995/llm-eval-frontend:latest
-    container_name: llm_eval_frontend
+    image: y28101995/promptpit-frontend:latest
+    container_name: promptpit-frontend
     environment:
       - REACT_APP_API_URL=http://localhost:8000
       - NODE_ENV=production
