@@ -60,7 +60,10 @@ const CollapsibleSidebar = ({ children }) => {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setMobileSidebarOpen(false)} />
         <div className="fixed inset-y-0 left-0 flex w-56 flex-col bg-slate-900 border-r border-slate-800">
           <div className="flex h-16 items-center justify-between px-4">
-            <h1 className="text-xl font-bold text-white">🔨 PromptPit</h1>
+            <div className="flex items-center space-x-2">
+              <img src="/logo192.png" alt="PromptPit" className="h-8 w-8" />
+              <h1 className="text-xl font-bold text-white">PromptPit</h1>
+            </div>
             <button
               onClick={() => setMobileSidebarOpen(false)}
               className="text-slate-400 hover:text-white transition-colors"
@@ -96,12 +99,15 @@ const CollapsibleSidebar = ({ children }) => {
         {/* Header */}
         <div className="flex h-16 items-center justify-between px-4 border-b border-slate-800">
           {shouldExpand ? (
-            <h1 className="text-xl font-bold text-white transition-opacity duration-300">
-              🔨 PromptPit
-            </h1>
+            <div className="flex items-center space-x-2">
+              <img src="/logo192.png" alt="PromptPit" className="h-8 w-8" />
+              <h1 className="text-xl font-bold text-white transition-opacity duration-300">
+                PromptPit
+              </h1>
+            </div>
           ) : (
             <div className="w-8 h-8 flex items-center justify-center">
-              <span className="text-xl">🔨</span>
+              <img src="/logo192.png" alt="PromptPit" className="h-6 w-6" />
             </div>
           )}
           

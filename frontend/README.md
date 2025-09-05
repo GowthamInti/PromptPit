@@ -1,6 +1,10 @@
-# 🔨 PromptPit Frontend
+#  PromptPit Frontend
 
 A modern React frontend for PromptPit - a self-hosted tool for experimenting with prompts across multiple LLM providers.
+
+<div align="center">
+  <img src="docs/images/PromptPit.PNG" alt="PromptPit Logo" width="150" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+</div>
 
 ## 🚀 Features
 
@@ -21,6 +25,7 @@ A modern React frontend for PromptPit - a self-hosted tool for experimenting wit
 - **React Hot Toast** - Toast notifications
 - **Heroicons** - Beautiful SVG icons
 - **Headless UI** - Accessible UI components
+- **PWA Support** - Progressive Web App with custom icons and manifest
 
 ## 📦 Installation
 

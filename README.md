@@ -3,6 +3,8 @@
 **AI Prompt Engineering & Testing Platform**
 
 <div align="center">
+  <img src="frontend/docs/images/PromptPit.PNG" alt="PromptPit Logo" width="200" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+  <br><br>
   <img src="frontend/docs/images/forge.png" alt="PromptPit Interface" width="800" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
 </div>
 
@@ -82,6 +84,12 @@ PromptPit is a powerful, self-hosted platform designed for AI researchers, devel
 <div align="center">
   <img src="frontend/docs/images/stash.png" alt="PromptPit User Interface" width="700" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
 </div>
+
+### **Branding & Icons**
+- **Custom Logo**: Distinctive PromptPit branding with hammer icon
+- **Favicon Support**: Browser tab icon for easy identification
+- **PWA Ready**: Progressive Web App manifest with custom icons
+- **Consistent Theming**: Battle-themed visual identity throughout
 
 ### **Modern Interface**
 - **Dark Theme**: Easy on the eyes for extended use
