@@ -2,7 +2,6 @@
 
 **AI Prompt Engineering & Testing Platform**
 
-# [![GitHub release](https://img.shields.io/github/release/GowthamInti/PromptPit.svg)](https://github.com/GowthamInti/PromptPit/releases)
 [![GitHub stars](https://img.shields.io/github/stars/GowthamInti/PromptPit.svg)](https://github.com/GowthamInti/PromptPit/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/GowthamInti/PromptPit.svg)](https://github.com/GowthamInti/PromptPit/network)
 [![GitHub issues](https://img.shields.io/github/issues/GowthamInti/PromptPit.svg)](https://github.com/GowthamInti/PromptPit/issues)
