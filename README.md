@@ -92,18 +92,6 @@ PromptPit is a powerful, self-hosted platform designed for AI researchers, devel
   <img src="frontend/docs/images/stash.png" alt="PromptPit User Interface" width="700" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
 </div>
 
-### **Branding & Icons**
-- **Custom Logo**: Distinctive PromptPit branding with hammer icon
-- **Favicon Support**: Browser tab icon for easy identification
-- **PWA Ready**: Progressive Web App manifest with custom icons
-- **Consistent Theming**: Battle-themed visual identity throughout
-
-### **Modern Interface**
-- **Dark Theme**: Easy on the eyes for extended use
-- **Responsive Design**: Works on desktop, tablet, and mobile
-- **Collapsible Sidebar**: Maximize workspace when needed
-- **Intuitive Navigation**: Clear, battle-themed terminology
-
 ### **Performance Optimized**
 - **Fast Loading**: Optimized for quick prompt execution
 - **Real-time Updates**: Live status and progress indicators
@@ -124,6 +112,14 @@ PromptPit is a powerful, self-hosted platform designed for AI researchers, devel
 - **File Storage**: Organized document and image management
 - **Export/Import**: Backup and share prompt configurations
 - **Data Persistence**: Never lose your work with enterprise-grade storage
+
+### **Memory Management**
+- **LangChain Integration**: Built-in conversation memory using ChatMessageHistory
+- **TTL Cache System**: Automatic session cleanup with 1-hour expiration
+- **Scalable Storage**: Configurable cache size (up to 2000 concurrent sessions)
+- **Session Persistence**: Maintains conversation context during active sessions
+- **Memory Statistics**: Real-time monitoring of cache usage and performance
+- **Automatic Cleanup**: Prevents memory leaks with intelligent session management
 
 ### **Security**
 - **API Key Management**: Secure storage of provider credentials
