@@ -1,10 +1,23 @@
-#  PromptPit Frontend
+# 🔨 PromptPit
 
-A modern React frontend for PromptPit - a self-hosted tool for experimenting with prompts across multiple LLM providers.
+**AI Prompt Engineering & Testing Platform**
+
+[![GitHub release](https://img.shields.io/github/release/GowthamInti/PromptPit.svg)](https://github.com/GowthamInti/PromptPit/releases)
+[![GitHub stars](https://img.shields.io/github/stars/GowthamInti/PromptPit.svg)](https://github.com/GowthamInti/PromptPit/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/GowthamInti/PromptPit.svg)](https://github.com/GowthamInti/PromptPit/network)
+[![GitHub issues](https://img.shields.io/github/issues/GowthamInti/PromptPit.svg)](https://github.com/GowthamInti/PromptPit/issues)
+[![GitHub license](https://img.shields.io/github/license/GowthamInti/PromptPit.svg)](https://github.com/GowthamInti/PromptPit/blob/main/LICENSE)
+[![Docker Build](https://img.shields.io/docker/build/gowthaminti/promptpit.svg)](https://hub.docker.com/r/gowthaminti/promptpit)
+[![Docker Pulls](https://img.shields.io/docker/pulls/gowthaminti/promptpit.svg)](https://hub.docker.com/r/gowthaminti/promptpit)
+[![Build Status](https://img.shields.io/github/workflow/status/GowthamInti/PromptPit/CI.svg)](https://github.com/GowthamInti/PromptPit/actions)
 
 <div align="center">
-  <img src="docs/images/PromptPit.PNG" alt="PromptPit Logo" width="150" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+  <img src="frontend/docs/images/PromptPit.PNG" alt="PromptPit Logo" width="200" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+  <br><br>
+  <img src="frontend/docs/images/forge.png" alt="PromptPit Interface" width="800" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
 </div>
+
+PromptPit is a powerful, self-hosted platform designed for AI researchers, developers, and prompt engineers to experiment, test, and optimize prompts across multiple Large Language Model (LLM) providers. Built with a gritty, battle-themed interface, PromptPit transforms prompt engineering into an engaging experience.
 
 ## 🚀 Features
 
