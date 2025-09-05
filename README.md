@@ -2,10 +2,20 @@
 
 **AI Prompt Engineering & Testing Platform**
 
+[![GitHub release](https://img.shields.io/github/release/GowthamInti/PromptPit.svg)](https://github.com/GowthamInti/PromptPit/releases)
+[![GitHub stars](https://img.shields.io/github/stars/GowthamInti/PromptPit.svg)](https://github.com/GowthamInti/PromptPit/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/GowthamInti/PromptPit.svg)](https://github.com/GowthamInti/PromptPit/network)
+[![GitHub issues](https://img.shields.io/github/issues/GowthamInti/PromptPit.svg)](https://github.com/GowthamInti/PromptPit/issues)
+[![GitHub license](https://img.shields.io/github/license/GowthamInti/PromptPit.svg)](https://github.com/GowthamInti/PromptPit/blob/main/LICENSE)
+[![Docker Build](https://img.shields.io/docker/build/28101995/promptpit-backend.svg)](https://hub.docker.com/r/28101995/promptpit-backend)
+[![Docker Pulls](https://img.shields.io/docker/pulls/28101995/promptpit-backend.svg)](https://hub.docker.com/r/28101995/promptpit-backend)
+[![Docker Build](https://img.shields.io/docker/build/28101995/promptpit-frontend.svg)](https://hub.docker.com/r/28101995/promptpit-frontend)
+[![Docker Pulls](https://img.shields.io/docker/pulls/28101995/promptpit-frontend.svg)](https://hub.docker.com/r/28101995/promptpit-frontend)
+[![Build Status](https://img.shields.io/github/workflow/status/GowthamInti/PromptPit/Build%20and%20Push%20Docker%20Images%20(Simple).svg)](https://github.com/GowthamInti/PromptPit/actions)
+
 <div align="center">
   <img src="frontend/docs/images/PromptPit.PNG" alt="PromptPit Logo" width="200" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
   <br><br>
-  <img src="frontend/docs/images/forge.png" alt="PromptPit Interface" width="800" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
 </div>
 
 PromptPit is a powerful, self-hosted platform designed for AI researchers, developers, and prompt engineers to experiment, test, and optimize prompts across multiple Large Language Model (LLM) providers. Built with a gritty, battle-themed interface, PromptPit transforms prompt engineering into an engaging experience.
