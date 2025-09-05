@@ -425,6 +425,7 @@ async def run_prompt(
         try:
             prompt_data = {
                 "provider_id": provider.id,
+                "model_id": model.id,  # Fixed: use model_id instead of model_name
                 "model_name": model.name,
                 "text": text,
                 "system_prompt": system_prompt,

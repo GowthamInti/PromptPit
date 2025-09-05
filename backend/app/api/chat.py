@@ -118,6 +118,7 @@ async def send_message(
         # Build prompt data similar to run_prompt endpoint
         prompt_data = {
             "provider_id": provider.id,
+            "model_id": model.id,  # Fixed: use model_id instead of model_name
             "model_name": model.name,
             "text": enhanced_message,
             "system_prompt": system_prompt or "You are a helpful AI assistant. Continue the conversation naturally.",

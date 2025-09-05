@@ -243,6 +243,14 @@ const Dashboard = () => {
                     <p className="text-sm text-muted">
                       GPT-4, GPT-3.5-turbo, and more
                     </p>
+                    <a
+                      href="https://platform.openai.com/docs/models"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-400 hover:text-blue-300 underline"
+                    >
+                      View all models →
+                    </a>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -371,6 +379,14 @@ const Dashboard = () => {
                     <p className="text-sm text-muted">
                       Llama2, Mixtral, and other open-source models
                     </p>
+                    <a
+                      href="https://console.groq.com/docs/models"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-400 hover:text-blue-300 underline"
+                    >
+                      View all models →
+                    </a>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">

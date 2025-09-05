@@ -376,13 +376,24 @@ const PromptEditor = () => {
   // };
 
   const handleRunPrompt = async () => {
-    if (!selectedProvider || !selectedModel) {
-      toast.error('Please select a provider and model');
+    if (!selectedProvider) {
+      toast.error('Please select a provider first');
+      return;
+    }
+    
+    if (!selectedModel) {
+      toast.error('Please select a model first');
       return;
     }
 
     if (!promptData.text.trim()) {
       toast.error('Please enter a prompt');
+      return;
+    }
+    
+    // Check if model supports vision when images are uploaded
+    if (uploadedImages.length > 0 && !selectedModel.supports_vision) {
+      toast.error(`Model "${selectedModel.name}" does not support vision. Please select a vision-capable model or remove the images.`);
       return;
     }
 
@@ -786,6 +797,7 @@ const PromptEditor = () => {
             <Cog6ToothIcon className="h-4 w-4" />
             <span className="text-sm">
               {selectedProvider?.name || 'No Provider'} / {selectedModel?.name || 'No Model'}
+              {selectedModel?.supports_vision && ' 👁️'}
             </span>
           </button>
         </div>
@@ -809,6 +821,22 @@ const PromptEditor = () => {
                   </option>
                 ))}
               </select>
+              {selectedProvider && (
+                <div className="mt-2">
+                  <a
+                    href={selectedProvider.name === 'openai' 
+                      ? 'https://platform.openai.com/docs/models' 
+                      : selectedProvider.name === 'groq' 
+                      ? 'https://console.groq.com/docs/models' 
+                      : '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-400 hover:text-blue-300 underline"
+                  >
+                    View {selectedProvider.name} models →
+                  </a>
+                </div>
+              )}
             </div>
 
             <div>
@@ -822,15 +850,33 @@ const PromptEditor = () => {
                 <option value="">Select Model</option>
                 {models
                   .filter(model => !selectedProvider || model.provider_id === selectedProvider.id)
+                  .sort((a, b) => {
+                    // Sort vision-capable models first
+                    if (a.supports_vision && !b.supports_vision) return -1;
+                    if (!a.supports_vision && b.supports_vision) return 1;
+                    return a.name.localeCompare(b.name);
+                  })
                   .map((model) => (
                     <option key={model.id} value={model.id}>
-                      {model.name}
+                      {model.name} {model.supports_vision ? '(Vision)' : ''}
                     </option>
                   ))}
               </select>
+              {selectedModel && (
+                <div className="mt-2 flex items-center gap-2">
+                  {selectedModel.supports_vision && (
+                    <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">
+                      👁️ Vision Capable
+                    </span>
+                  )}
+                  {uploadedImages.length > 0 && !selectedModel.supports_vision && (
+                    <span className="text-xs bg-red-600 text-white px-2 py-1 rounded">
+                      ⚠️ No Vision Support
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
-
-
           </div>
         </div>
       )}
@@ -1261,6 +1307,23 @@ Example with property order:
                   </>
                 )}
               </button>
+              
+              {/* Status Message */}
+              <div className="mt-2 text-xs text-slate-400">
+                {!selectedProvider ? (
+                  <span className="text-yellow-400">⚠️ Please select a provider to run the prompt</span>
+                ) : !selectedModel ? (
+                  <span className="text-yellow-400">⚠️ Please select a model to run the prompt</span>
+                ) : !promptData.text.trim() ? (
+                  <span className="text-yellow-400">⚠️ Please enter a prompt to run</span>
+                ) : uploadedImages.length > 0 && !selectedModel.supports_vision ? (
+                  <span className="text-red-400">⚠️ Selected model doesn't support vision. Remove images or select a vision-capable model.</span>
+                ) : structuredOutput && !jsonSchemaContent ? (
+                  <span className="text-yellow-400">⚠️ Please provide a JSON schema for structured output</span>
+                ) : (
+                  <span className="text-green-400">✅ Ready to run! {selectedModel.supports_vision ? 'Vision support enabled.' : ''}</span>
+                )}
+              </div>
             </div>
           </div>
 
